@@ -1,3 +1,4 @@
+use super::queue::Queue;
 use std::sync::Arc;
 
 use anyhow::{Context, Result};
@@ -8,13 +9,8 @@ use ash::{
 
 pub struct Device {
     intern: ash::Device,
+    pdevice: PhysicalDevice,
     instance: Arc<super::Instance>,
-}
-
-pub struct Queue {
-    intern: vk::Queue,
-    queue_family_index: u32,
-    device: Arc<Device>,
 }
 
 impl Device {
@@ -61,6 +57,7 @@ impl Device {
         let device = Arc::new(Device {
             intern: device_raw,
             instance: instance.clone(),
+            pdevice,
         });
 
         let queue = Arc::new(Queue {
@@ -134,10 +131,18 @@ impl Device {
             })
             .unwrap()
     }
+
+    pub fn memory_priorities(&self) -> vk::PhysicalDeviceMemoryProperties {
+        unsafe { self.instance.as_raw().get_physical_device_memory_properties(self.pdevice) }
+    }
+
+    pub fn as_raw(&self) -> ash::Device {
+        self.intern.clone()
+    }
 }
 
-impl Drop for Queue {
+impl Drop for Device {
     fn drop(&mut self) {
-        unsafe { self.device.intern.destroy_device(None) };
+        unsafe { self.intern.destroy_device(None) };
     }
 }

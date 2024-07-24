@@ -13,6 +13,11 @@ pub struct Instance {
 }
 
 impl Instance {
+
+    pub fn new_default() -> Result<Arc<Self>> {
+        unsafe { Self::from_extensions(&[]) }
+    }
+
     pub unsafe fn from_extensions(extensions: &[*const c_char]) -> Result<Arc<Self>> {
         // load the vulkan library
         let entry = ash::Entry::load()?;
