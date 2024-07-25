@@ -9,11 +9,13 @@ pub struct Queue {
 }
 
 impl Queue {
-
     pub fn family_index(&self) -> u32 {
         self.queue_family_index
     }
 
+    pub fn as_raw(&self) -> vk::Queue {
+        self.intern.clone()
+    }
 }
 
 

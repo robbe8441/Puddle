@@ -3,6 +3,8 @@ use std::sync::Arc;
 
 use ash::vk::{self, CommandPoolCreateFlags};
 
+use super::Subbuffer;
+
 pub struct CommandPool {
     intern: vk::CommandPool,
     queue_family: u32,
@@ -56,10 +58,58 @@ impl CommandBuffer {
             pool,
         })
     }
+
+    pub fn as_raw(&self) -> vk::CommandBuffer {
+        self.intern.clone()
+    }
+    fn device_raw(&self) -> ash::Device {
+        self.pool.device.as_raw()
+    }
+
+    pub fn begin(&self, begin_info: vk::CommandBufferUsageFlags) -> Result<()> {
+        unsafe {
+            self.device_raw().begin_command_buffer(
+                self.intern,
+                &vk::CommandBufferBeginInfo::default().flags(begin_info),
+            )
+        }?;
+        Ok(())
+    }
+
+    pub fn end(&self) {
+        unsafe { self.device_raw().end_command_buffer(self.intern) }.unwrap();
+    }
+
+    pub fn update_buffer<T: bytemuck::Pod>(
+        &self,
+        buffer: Arc<Subbuffer<T>>,
+        offset: u64,
+        data: &[T],
+    ) {
+        let data = bytemuck::cast_slice(data);
+
+        if std::mem::size_of_val(data) as u64 > buffer.size() - offset {
+            panic!("the data exeeds the max limit of this buffer");
+        }
+
+        unsafe {
+            self.device_raw().cmd_update_buffer(
+                self.intern,
+                buffer.raw_buffer(),
+                offset + buffer.offset(),
+                data,
+            )
+        };
+    }
 }
 
 impl Drop for CommandBuffer {
     fn drop(&mut self) {
-        unsafe { self.pool.device.as_raw().free_command_buffers(self.pool.intern, &[self.intern]) };
+        unsafe {
+            self.pool
+                .device
+                .as_raw()
+                .free_command_buffers(self.pool.intern, &[self.intern])
+        };
     }
 }
