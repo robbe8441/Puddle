@@ -1,5 +1,5 @@
 use ash::vk;
-use VkRender::instances::*;
+use vk_render::instances::*;
 
 #[test]
 pub fn allocate_buffer() {

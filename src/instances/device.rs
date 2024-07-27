@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use ash::{
+    ext::descriptor_indexing,
     khr::swapchain,
     vk::{self, PhysicalDevice},
 };
@@ -15,10 +16,14 @@ pub struct Device {
 
 impl Device {
     pub fn new_default(instance: Arc<super::Instance>) -> Result<(Arc<Self>, Arc<Queue>)> {
-        let features = vk::PhysicalDeviceFeatures {
-            shader_clip_distance: 1,
-            ..Default::default()
-        };
+
+        let features = vk::PhysicalDeviceFeatures::default()
+            .shader_clip_distance(true)
+            .shader_uniform_buffer_array_dynamic_indexing(true)
+            .shader_storage_buffer_array_dynamic_indexing(true)
+            .shader_sampled_image_array_dynamic_indexing(true)
+            .shader_storage_image_array_dynamic_indexing(true);
+
 
         let (pdevice, queue_index) = unsafe {
             Self::get_pdevice_with_queue_flags(instance.clone(), vk::QueueFlags::GRAPHICS)
@@ -42,10 +47,10 @@ impl Device {
 
         let device_extension_names_raw = [
             swapchain::NAME.as_ptr(),
+            descriptor_indexing::NAME.as_ptr(),
             #[cfg(any(target_os = "macos", target_os = "ios"))]
             ash::khr::portability_subset::NAME.as_ptr(),
         ];
-
         let device_create_info = vk::DeviceCreateInfo::default()
             .queue_create_infos(std::slice::from_ref(&queue_info))
             .enabled_extension_names(&device_extension_names_raw)
@@ -133,7 +138,11 @@ impl Device {
     }
 
     pub fn memory_priorities(&self) -> vk::PhysicalDeviceMemoryProperties {
-        unsafe { self.instance.as_raw().get_physical_device_memory_properties(self.pdevice) }
+        unsafe {
+            self.instance
+                .as_raw()
+                .get_physical_device_memory_properties(self.pdevice)
+        }
     }
 
     pub fn as_raw(&self) -> ash::Device {
@@ -143,6 +152,7 @@ impl Device {
 
 impl Drop for Device {
     fn drop(&mut self) {
+        let _ = unsafe { self.intern.device_wait_idle() };
         unsafe { self.intern.destroy_device(None) };
     }
 }

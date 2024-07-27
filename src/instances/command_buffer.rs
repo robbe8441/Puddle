@@ -3,7 +3,7 @@ use std::sync::Arc;
 
 use ash::vk::{self, CommandPoolCreateFlags};
 
-use super::Subbuffer;
+use super::{compute::PipelineCompute, Subbuffer};
 
 pub struct CommandPool {
     intern: vk::CommandPool,
@@ -99,6 +99,39 @@ impl CommandBuffer {
                 offset + buffer.offset(),
                 data,
             )
+        };
+    }
+
+    pub fn bind_pipeline_compute(&self, pipeline: Arc<PipelineCompute>) {
+        unsafe {
+            self.device_raw().cmd_bind_pipeline(
+                self.intern,
+                vk::PipelineBindPoint::COMPUTE,
+                pipeline.as_raw(),
+            )
+        };
+    }
+
+    pub fn bind_descriptor_set(
+        &self,
+        set: Arc<crate::instances::descriptors::descriptor_pool::DescriptorSet>,
+        pipeline: Arc<PipelineCompute>,
+    ) {
+        unsafe {
+            self.device_raw().cmd_bind_descriptor_sets(
+                self.intern,
+                vk::PipelineBindPoint::COMPUTE,
+                pipeline.layout(),
+                0,
+                &set.as_raw(),
+                &[],
+            )
+        };
+    }
+
+    pub fn dispatch(&self, x: u32, y: u32, z: u32) {
+        unsafe {
+            self.device_raw().cmd_dispatch(self.intern, x, y, z);
         };
     }
 }
