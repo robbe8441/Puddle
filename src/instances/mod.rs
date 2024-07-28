@@ -5,9 +5,10 @@ mod queue;
 mod command_buffer;
 mod buffer;
 mod sync;
-pub mod descriptors;
 mod shader_module;
 mod pipeline;
+mod swapchain;
+pub mod descriptors;
 pub mod debugger;
 
 pub use instance::Instance;

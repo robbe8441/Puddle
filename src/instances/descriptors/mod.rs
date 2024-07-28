@@ -1,5 +1,16 @@
+use std::sync::Arc;
+
 use ash::vk;
-pub mod descriptor_pool;
+
+use super::BufferAllocation;
+
+mod descriptor_pool;
+mod descriptor_set;
+
+pub use descriptor_pool::*;
+pub use descriptor_set::*;
+
+pub use vk::DescriptorPoolSize;
 
 
 #[allow(unused)]
@@ -11,6 +22,14 @@ pub enum DescriptorType {
     UniformTexelBuffer,
 }
 
+pub struct  WriteDescriptorSet<'a> {
+    pub buffer_info: Option<&'a [vk::DescriptorBufferInfo]>,
+    pub image_info: Option<&'a [vk::DescriptorImageInfo]>,
+    pub dst_binding: u32,
+    pub descriptor_count: u32,
+    pub dst_set: u32,
+    pub descriptor_type: vk::DescriptorType,
+}
 
 
 
@@ -25,10 +44,3 @@ impl Into<vk::DescriptorType> for DescriptorType {
         }
     }
 }
-
-
-
-
-
-
-

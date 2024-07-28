@@ -11,7 +11,7 @@ pub struct PipelineCompute {
 }
 
 impl PipelineCompute {
-    pub fn new(device: Arc<Device>, shader: Arc<ShaderModule>, descriptors: Arc<crate::instances::descriptors::descriptor_pool::DescriptorSet>) -> Result<Arc<Self>> {
+    pub fn new(device: Arc<Device>, shader: Arc<ShaderModule>, descriptors: Arc<crate::instances::descriptors::DescriptorSet>) -> Result<Arc<Self>> {
         let device_raw = device.as_raw();
 
         let mut entry = shader.entry().to_string();

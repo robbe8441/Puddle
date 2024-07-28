@@ -20,7 +20,7 @@ impl Surface {
     pub unsafe fn new(
         instance: Arc<Instance>,
         window: impl HasWindowHandle + HasDisplayHandle,
-    ) -> Result<Self> {
+    ) -> Result<Arc<Self>> {
         let instance_raw = instance.as_raw();
         let entry = instance.entry();
 
@@ -113,7 +113,7 @@ impl Surface {
 
         let loader = surface::Instance::new(&entry, &instance_raw);
 
-        Ok(Self { intern: surface, loader })
+        Ok(Arc::new(Self { intern: surface, loader }))
     }
 
     pub fn enumerate_required_extensions(
@@ -168,5 +168,11 @@ impl Surface {
 
     pub fn as_raw(&self) -> vk::SurfaceKHR {
         self.intern.clone()
+    }
+}
+
+impl Drop for Surface {
+    fn drop(&mut self) {
+        unsafe { self.loader.destroy_surface(self.intern, None) };
     }
 }

@@ -145,6 +145,9 @@ impl Device {
         }
     }
 
+    pub fn physical_device(&self) -> vk::PhysicalDevice {
+        self.pdevice
+    }
     pub fn as_raw(&self) -> ash::Device {
         self.intern.clone()
     }

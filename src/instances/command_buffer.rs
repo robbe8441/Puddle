@@ -1,3 +1,4 @@
+use crate::instances::BufferAllocation;
 use anyhow::{Context, Result};
 use std::sync::Arc;
 
@@ -95,7 +96,7 @@ impl CommandBuffer {
         unsafe {
             self.device_raw().cmd_update_buffer(
                 self.intern,
-                buffer.raw_buffer(),
+                buffer.buffer_raw(),
                 offset + buffer.offset(),
                 data,
             )
@@ -114,7 +115,7 @@ impl CommandBuffer {
 
     pub fn bind_descriptor_set(
         &self,
-        set: Arc<crate::instances::descriptors::descriptor_pool::DescriptorSet>,
+        set: Arc<crate::instances::descriptors::DescriptorSet>,
         pipeline: Arc<PipelineCompute>,
     ) {
         unsafe {

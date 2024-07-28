@@ -2,11 +2,10 @@ use anyhow::Result;
 use ash::vk;
 use std::sync::Arc;
 
-use super::raw_buffer::RawBuffer;
+use super::{raw_buffer::RawBuffer, BufferAllocation};
 use crate::instances::Device;
 
 pub struct Subbuffer<T> {
-    mem: vk::DeviceMemory,
     raw_buffer: Arc<RawBuffer>,
     device: Arc<Device>,
 
@@ -18,42 +17,18 @@ pub struct Subbuffer<T> {
 impl<T> Subbuffer<T> {
     pub fn from_raw(raw_buffer: Arc<RawBuffer>) -> Result<Arc<Subbuffer<T>>> {
         let device = raw_buffer.device();
-        let device_raw = device.as_raw();
-
-        let vertex_buffer_allocate_info = vk::MemoryAllocateInfo {
-            allocation_size: raw_buffer.memory_req().size,
-            memory_type_index: raw_buffer.memory_index(),
-            ..Default::default()
-        };
-
-        let mem = unsafe { device_raw.allocate_memory(&vertex_buffer_allocate_info, None) }?;
-
-        unsafe { device_raw.bind_buffer_memory(raw_buffer.as_raw(), mem, 0) }.unwrap();
 
         Ok(Arc::new(Subbuffer {
+            size: raw_buffer.size(),
+            offset: 0,
             device,
             raw_buffer,
-            mem,
-            size: vertex_buffer_allocate_info.allocation_size,
-            offset: 0,
             _marker: std::marker::PhantomData,
         }))
     }
-
-
-
-
-    pub fn offset(&self) -> u64 {
-        self.offset
-    }
-    pub fn size(&self) -> u64 {
-        self.size
-    }
-
-    pub fn raw_buffer(&self) -> vk::Buffer {
-        self.raw_buffer.as_raw()
-    }
 }
+
+
 impl<T:Copy> Subbuffer<T> {
 
     pub fn from_data(device: Arc<Device>, create_info: vk::BufferCreateInfo, property_flags: vk::MemoryPropertyFlags, data: &[T]) -> Result<Arc<Subbuffer<T>>> {
@@ -68,21 +43,12 @@ impl<T:Copy> Subbuffer<T> {
 
 
     pub fn read(&self) -> Result<&[T]> {
-        if !self
-            .raw_buffer
-            .properties()
-            .contains(vk::MemoryPropertyFlags::HOST_VISIBLE)
-        {
-            panic!(
-                "the host is not allowed to acces this buffer, the HOST_VISIBLE flag isnt given"
-            );
-        }
 
         let device_raw = self.device.as_raw();
 
         let ptr = unsafe {
             device_raw.map_memory(
-                self.mem,
+                self.raw_buffer.memory().as_raw(),
                 self.offset,
                 self.size,
                 vk::MemoryMapFlags::empty(),
@@ -91,28 +57,19 @@ impl<T:Copy> Subbuffer<T> {
 
         let data = unsafe { std::slice::from_raw_parts(ptr, self.size as usize / std::mem::size_of::<T>()) };
 
-        // unsafe { device_raw.unmap_memory(self.mem) };
+        // unsafe { device_raw.unmap_memory(self.raw_buffer.memory()) };
 
         Ok(data)
     }
 
 
     pub fn write(&self, data: &[T]) -> Result<()> {
-        if !self
-            .raw_buffer
-            .properties()
-            .contains(vk::MemoryPropertyFlags::HOST_VISIBLE)
-        {
-            panic!(
-                "the host is not allowed to acces this buffer, the HOST_VISIBLE flag isnt given"
-            );
-        }
 
         let device_raw = self.device.as_raw();
 
         let ptr = unsafe {
             device_raw.map_memory(
-                self.mem,
+                self.raw_buffer.memory().as_raw(),
                 self.offset,
                 self.size,
                 vk::MemoryMapFlags::empty(),
@@ -124,14 +81,31 @@ impl<T:Copy> Subbuffer<T> {
 
         align.copy_from_slice(&data);
 
-        // unsafe { device_raw.unmap_memory(self.mem) };
+        // unsafe { device_raw.unmap_memory(self.raw_buffer.memory()) };
 
         Ok(())
     }
-}
 
-impl<T> Drop for Subbuffer<T> {
-    fn drop(&mut self) {
-        unsafe { self.device.as_raw().free_memory(self.mem, None) };
+    pub fn desc(&self) -> vk::DescriptorBufferInfo {
+        vk::DescriptorBufferInfo {
+            buffer: self.buffer_raw(),
+            offset: self.offset,
+            range: self.size,
+        }
     }
 }
+
+impl <T>super::BufferAllocation for Subbuffer<T> {
+    fn offset(&self) -> u64 {
+        self.offset
+    }
+    fn size(&self) -> u64 {
+        self.size
+    }
+
+    fn buffer_raw(&self) -> vk::Buffer {
+        self.raw_buffer.as_raw()
+    }
+}
+
+

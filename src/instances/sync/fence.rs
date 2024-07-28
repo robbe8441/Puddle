@@ -1,5 +1,5 @@
 use crate::instances::CommandBuffer;
-use crate::instances::{Device, queue::Queue};
+use crate::instances::{queue::Queue, Device};
 use anyhow::Result;
 use std::sync::Arc;
 
@@ -26,14 +26,34 @@ impl Fence {
         let buffers: Vec<vk::CommandBuffer> = buffers.into_iter().map(|v| v.as_raw()).collect();
         let submits = [vk::SubmitInfo::default().command_buffers(&buffers)];
 
-        unsafe { self.device.as_raw().queue_submit(queue.as_raw(), &submits, self.intern) }?;
+        unsafe {
+            self.device
+                .as_raw()
+                .queue_submit(queue.as_raw(), &submits, self.intern)
+        }?;
 
         Ok(())
     }
 
     pub fn wait_for_finished(&self, timeout: u64) -> Result<()> {
-        unsafe { self.device.as_raw().wait_for_fences(&[self.intern], true, timeout) }?;
+        let res = unsafe {
+            self.device
+                .as_raw()
+                .wait_for_fences(&[self.intern], true, timeout)
+        };
+
+        if let Err(e) = res {
+            match e {
+                ash::vk::Result::TIMEOUT => return Ok(()),
+                _ => return Err(e.into()),
+            }
+        }
+
         Ok(())
+    }
+
+    pub fn as_raw(&self) -> vk::Fence {
+        self.intern
     }
 }
 
