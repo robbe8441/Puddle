@@ -17,13 +17,7 @@ pub struct Device {
 impl Device {
     pub fn new_default(instance: Arc<super::Instance>) -> Result<(Arc<Self>, Arc<Queue>)> {
 
-        let features = vk::PhysicalDeviceFeatures::default()
-            .shader_clip_distance(true)
-            .shader_uniform_buffer_array_dynamic_indexing(true)
-            .shader_storage_buffer_array_dynamic_indexing(true)
-            .shader_sampled_image_array_dynamic_indexing(true)
-            .shader_storage_image_array_dynamic_indexing(true);
-
+        let features = vk::PhysicalDeviceFeatures::default();
 
         let (pdevice, queue_index) = unsafe {
             Self::get_pdevice_with_queue_flags(instance.clone(), vk::QueueFlags::GRAPHICS)
@@ -32,6 +26,7 @@ impl Device {
 
         unsafe { Self::from_features(instance, pdevice, queue_index as u32, &features) }
     }
+
 
     pub unsafe fn from_features(
         instance: Arc<super::Instance>,
@@ -47,7 +42,6 @@ impl Device {
 
         let device_extension_names_raw = [
             swapchain::NAME.as_ptr(),
-            descriptor_indexing::NAME.as_ptr(),
             #[cfg(any(target_os = "macos", target_os = "ios"))]
             ash::khr::portability_subset::NAME.as_ptr(),
         ];
@@ -103,7 +97,7 @@ impl Device {
 
     unsafe fn get_pdevice_from_surface(
         instance: Arc<super::Instance>,
-        surface: super::Surface,
+        surface: Arc<super::Surface>,
     ) -> (PhysicalDevice, usize) {
         let surface_loader = surface.loader();
 

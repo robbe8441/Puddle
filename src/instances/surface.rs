@@ -17,7 +17,7 @@ pub struct Surface {
 }
 
 impl Surface {
-    pub unsafe fn new(
+    pub fn new(
         instance: Arc<Instance>,
         window: impl HasWindowHandle + HasDisplayHandle,
     ) -> Result<Arc<Self>> {
@@ -38,7 +38,7 @@ impl Surface {
                             .get(),
                     );
                 let surface_fn = win32_surface::Instance::new(&entry, &instance_raw);
-                surface_fn.create_win32_surface(&surface_desc, None)
+                unsafe { surface_fn.create_win32_surface(&surface_desc, None) }
             }
 
             (RawDisplayHandle::Wayland(display), RawWindowHandle::Wayland(window)) => {
@@ -46,7 +46,7 @@ impl Surface {
                     .display(display.display.as_ptr())
                     .surface(window.surface.as_ptr());
                 let surface_fn = wayland_surface::Instance::new(&entry, &instance_raw);
-                surface_fn.create_wayland_surface(&surface_desc, None)
+                unsafe { surface_fn.create_wayland_surface(&surface_desc, None) }
             }
 
             (RawDisplayHandle::Xlib(display), RawWindowHandle::Xlib(window)) => {
@@ -59,7 +59,7 @@ impl Surface {
                     )
                     .window(window.window);
                 let surface_fn = xlib_surface::Instance::new(&entry, &instance_raw);
-                surface_fn.create_xlib_surface(&surface_desc, None)
+                unsafe { surface_fn.create_xlib_surface(&surface_desc, None) }
             }
 
             (RawDisplayHandle::Xcb(display), RawWindowHandle::Xcb(window)) => {
@@ -72,14 +72,14 @@ impl Surface {
                     )
                     .window(window.window.get());
                 let surface_fn = xcb_surface::Instance::new(&entry, &instance_raw);
-                surface_fn.create_xcb_surface(&surface_desc, None)
+                unsafe { surface_fn.create_xcb_surface(&surface_desc, None) }
             }
 
             (RawDisplayHandle::Android(_), RawWindowHandle::AndroidNdk(window)) => {
                 let surface_desc = vk::AndroidSurfaceCreateInfoKHR::default()
                     .window(window.a_native_window.as_ptr());
                 let surface_fn = android_surface::Instance::new(&entry, &instance_raw);
-                surface_fn.create_android_surface(&surface_desc, None)
+                unsafe { surface_fn.create_android_surface(&surface_desc, None) }
             }
 
             #[cfg(target_os = "macos")]
@@ -92,7 +92,7 @@ impl Surface {
 
                 let surface_desc = vk::MetalSurfaceCreateInfoEXT::default().layer(&*layer);
                 let surface_fn = metal_surface::Instance::new(&entry, &instance_raw);
-                surface_fn.create_metal_surface(&surface_desc, None)
+                unsafe { surface_fn.create_metal_surface(&surface_desc, None) }
             }
 
             #[cfg(target_os = "ios")]
@@ -105,7 +105,7 @@ impl Surface {
 
                 let surface_desc = vk::MetalSurfaceCreateInfoEXT::default().layer(&*layer);
                 let surface_fn = metal_surface::Instance::new(&entry, &instance_raw);
-                surface_fn.create_metal_surface(&surface_desc, None)
+                unsafe { surface_fn.create_metal_surface(&surface_desc, None) }
             }
 
             _ => Err(vk::Result::ERROR_EXTENSION_NOT_PRESENT),
@@ -113,12 +113,17 @@ impl Surface {
 
         let loader = surface::Instance::new(&entry, &instance_raw);
 
-        Ok(Arc::new(Self { intern: surface, loader }))
+        Ok(Arc::new(Self {
+            intern: surface,
+            loader,
+        }))
     }
 
     pub fn enumerate_required_extensions(
-        display_handle: RawDisplayHandle,
+        display_handle: impl HasDisplayHandle,
     ) -> VkResult<&'static [*const c_char]> {
+        let display_handle = display_handle.display_handle().unwrap().as_raw();
+
         let extensions = match display_handle {
             RawDisplayHandle::Windows(_) => {
                 const WINDOWS_EXTS: [*const c_char; 2] =

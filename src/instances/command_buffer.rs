@@ -116,14 +116,16 @@ impl CommandBuffer {
     pub fn bind_descriptor_set(
         &self,
         set: Arc<crate::instances::descriptors::DescriptorSet>,
-        pipeline: Arc<PipelineCompute>,
+        first_set: u32,
+        pipeline_layout: vk::PipelineLayout,
+        bind_point: vk::PipelineBindPoint,
     ) {
         unsafe {
             self.device_raw().cmd_bind_descriptor_sets(
                 self.intern,
-                vk::PipelineBindPoint::COMPUTE,
-                pipeline.layout(),
-                0,
+                bind_point,
+                pipeline_layout,
+                first_set,
                 &set.as_raw(),
                 &[],
             )

@@ -6,7 +6,7 @@ mod memory;
 
 pub use subbuffer::Subbuffer;
 pub use raw_buffer::RawBuffer;
-pub use memory::DeviceMemory;
+pub use memory::{DeviceMemory, find_memorytype_index};
 
 pub trait BufferAllocation {
     fn size(&self) -> u64;

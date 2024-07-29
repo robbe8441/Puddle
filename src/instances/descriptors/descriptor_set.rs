@@ -21,7 +21,7 @@ impl DescriptorSet {
                 binding: desc.dst_binding,
                 descriptor_type: desc.descriptor_type,
                 descriptor_count: desc.descriptor_count,
-                stage_flags: ShaderStageFlags::COMPUTE,
+                stage_flags: ShaderStageFlags::ALL,
                 ..Default::default()
             })
             .collect();
@@ -39,7 +39,7 @@ impl DescriptorSet {
         let descriptor_sets = unsafe { device_raw.allocate_descriptor_sets(&desc_alloc_info) }?;
 
         let writes: Vec<_> = writes
-            .into_iter()
+            .iter()
             .map(|write| {
                 let mut vkwrite = vk::WriteDescriptorSet::default()
                     .dst_binding(write.dst_binding)
