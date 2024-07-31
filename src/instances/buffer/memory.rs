@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use crate::instances::Device;
+use std::sync::Arc;
 
 use anyhow::{Context, Result};
 use ash::vk;
@@ -13,8 +13,11 @@ pub struct DeviceMemory {
 }
 
 impl DeviceMemory {
-    pub fn new(device: Arc<Device>, property_flags: vk::MemoryPropertyFlags, memory_req: vk::MemoryRequirements) -> Result<Arc<Self>> {
-
+    pub fn new(
+        device: Arc<Device>,
+        property_flags: vk::MemoryPropertyFlags,
+        memory_req: vk::MemoryRequirements,
+    ) -> Result<Arc<Self>> {
         let memory_index =
             find_memorytype_index(&memory_req, &device.memory_priorities(), property_flags)
                 .context("Unable to find suitable memorytype for the vertex buffer.")?;
@@ -45,14 +48,11 @@ impl DeviceMemory {
     }
 }
 
-
 impl Drop for DeviceMemory {
     fn drop(&mut self) {
         unsafe { self.device.as_raw().free_memory(self.intern, None) };
     }
 }
-
-
 
 pub fn find_memorytype_index(
     memory_req: &vk::MemoryRequirements,

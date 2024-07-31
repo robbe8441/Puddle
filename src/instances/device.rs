@@ -16,7 +16,6 @@ pub struct Device {
 
 impl Device {
     pub fn new_default(instance: Arc<super::Instance>) -> Result<(Arc<Self>, Arc<Queue>)> {
-
         let features = vk::PhysicalDeviceFeatures::default();
 
         let (pdevice, queue_index) = unsafe {
@@ -26,7 +25,6 @@ impl Device {
 
         unsafe { Self::from_features(instance, pdevice, queue_index as u32, &features) }
     }
-
 
     pub unsafe fn from_features(
         instance: Arc<super::Instance>,
@@ -142,8 +140,8 @@ impl Device {
     pub fn physical_device(&self) -> vk::PhysicalDevice {
         self.pdevice
     }
-    pub fn as_raw(&self) -> ash::Device {
-        self.intern.clone()
+    pub fn as_raw(&self) -> &ash::Device {
+        &self.intern
     }
 }
 

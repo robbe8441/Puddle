@@ -19,7 +19,6 @@ impl Instance {
     }
 
     pub unsafe fn from_extensions(extensions: &[*const c_char]) -> Result<Arc<Self>> {
-
         // load the vulkan library
         let entry = ash::Entry::load()?;
 

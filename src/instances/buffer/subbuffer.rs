@@ -28,10 +28,13 @@ impl<T> Subbuffer<T> {
     }
 }
 
-
-impl<T:Copy> Subbuffer<T> {
-
-    pub fn from_data(device: Arc<Device>, create_info: vk::BufferCreateInfo, property_flags: vk::MemoryPropertyFlags, data: &[T]) -> Result<Arc<Subbuffer<T>>> {
+impl<T: Copy> Subbuffer<T> {
+    pub fn from_data(
+        device: Arc<Device>,
+        create_info: vk::BufferCreateInfo,
+        property_flags: vk::MemoryPropertyFlags,
+        data: &[T],
+    ) -> Result<Arc<Subbuffer<T>>> {
         let raw_buffer = RawBuffer::new(device, create_info, property_flags)?;
 
         let subbuffer = Subbuffer::from_raw(raw_buffer)?;
@@ -41,9 +44,7 @@ impl<T:Copy> Subbuffer<T> {
         Ok(subbuffer)
     }
 
-
     pub fn read(&self) -> Result<&[T]> {
-
         let device_raw = self.device.as_raw();
 
         let ptr = unsafe {
@@ -55,16 +56,16 @@ impl<T:Copy> Subbuffer<T> {
             )
         }? as *mut T;
 
-        let data = unsafe { std::slice::from_raw_parts(ptr, self.size as usize / std::mem::size_of::<T>()) };
+        let data = unsafe {
+            std::slice::from_raw_parts(ptr, self.size as usize / std::mem::size_of::<T>())
+        };
 
         // unsafe { device_raw.unmap_memory(self.raw_buffer.memory()) };
 
         Ok(data)
     }
 
-
     pub fn write(&self, data: &[T]) -> Result<()> {
-
         let device_raw = self.device.as_raw();
 
         let ptr = unsafe {
@@ -95,7 +96,7 @@ impl<T:Copy> Subbuffer<T> {
     }
 }
 
-impl <T>super::BufferAllocation for Subbuffer<T> {
+impl<T> super::BufferAllocation for Subbuffer<T> {
     fn offset(&self) -> u64 {
         self.offset
     }
@@ -107,5 +108,3 @@ impl <T>super::BufferAllocation for Subbuffer<T> {
         self.raw_buffer.as_raw()
     }
 }
-
-

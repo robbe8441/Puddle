@@ -1,35 +1,30 @@
-use crate::instances::buffer::BufferAllocation;
-use crate::instances::{CommandBuffer, Device, ShaderModule, Subbuffer, Swapchain};
+mod pipeline_create_info;
+mod render_pass;
+
+use crate::{
+    instances::{BufferAllocation, CommandBuffer, Device, ShaderModule},
+    types::Vertex,
+};
 use ash::vk;
-use bytemuck::offset_of;
 use std::{ffi::CStr, sync::Arc};
 
 pub struct PipelineGraphics {
     intern: vk::Pipeline,
-    framebuffers: Vec<vk::Framebuffer>,
-    vertex_buffer: Arc<Subbuffer<Vertex>>,
-    renderpass: vk::RenderPass,
-    swapchain: Arc<Swapchain>,
+    pub renderpass: vk::RenderPass,
     layout: vk::PipelineLayout,
     device: Arc<Device>,
-    viewports: [vk::Viewport; 1],
-    scissors: [vk::Rect2D; 1],
-}
-
-#[derive(Clone, Copy, Default, Debug)]
-pub struct Vertex {
-    pub pos: [f32; 4],
-    pub color: [f32; 4],
 }
 
 impl PipelineGraphics {
-    pub fn test(
-        device: Arc<Device>,
-        swapchain: Arc<crate::instances::Swapchain>,
-    ) -> PipelineGraphics {
+
+    pub fn new(create_info: &pipeline_create_info::PipelineCreateInfo, layout: vk::PipelineLayout ) {
+
+    }
+
+    pub fn test(device: Arc<Device>, format: vk::Format, descriptors: Arc<crate::instances::descriptors::DescriptorSet>) -> PipelineGraphics {
         let renderpass_attachments = [
             vk::AttachmentDescription {
-                format: swapchain.format().format,
+                format,
                 samples: vk::SampleCountFlags::TYPE_1,
                 load_op: vk::AttachmentLoadOp::CLEAR,
                 store_op: vk::AttachmentStoreOp::STORE,
@@ -116,7 +111,10 @@ impl PipelineGraphics {
             },
         ];
 
-        let layout_create_info = vk::PipelineLayoutCreateInfo::default();
+        let descriptor_layouts = descriptors.layout();
+        let layout_create_info =
+            vk::PipelineLayoutCreateInfo::default().set_layouts(&descriptor_layouts);
+
         let pipeline_layout = unsafe {
             device
                 .as_raw()
@@ -124,25 +122,16 @@ impl PipelineGraphics {
         }
         .unwrap();
 
-        let vertex_input_binding_descriptions = [vk::VertexInputBindingDescription {
-            binding: 0,
-            stride: std::mem::size_of::<Vertex>() as u32,
-            input_rate: vk::VertexInputRate::VERTEX,
-        }];
-        let vertex_input_attribute_descriptions = [
-            vk::VertexInputAttributeDescription {
-                location: 0,
+        let vertex_input_binding_descriptions = [
+            vk::VertexInputBindingDescription {
                 binding: 0,
-                format: vk::Format::R32G32B32A32_SFLOAT,
-                offset: offset_of!(Vertex, pos) as u32,
-            },
-            vk::VertexInputAttributeDescription {
-                location: 1,
-                binding: 0,
-                format: vk::Format::R32G32B32A32_SFLOAT,
-                offset: offset_of!(Vertex, color) as u32,
+                stride: std::mem::size_of::<Vertex>() as u32,
+                input_rate: vk::VertexInputRate::VERTEX,
             },
         ];
+
+        let vertex_input_attribute_descriptions = [Vertex::desc()];
+
 
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::default()
             .vertex_attribute_descriptions(&vertex_input_attribute_descriptions)
@@ -151,24 +140,16 @@ impl PipelineGraphics {
             topology: vk::PrimitiveTopology::TRIANGLE_LIST,
             ..Default::default()
         };
-        let viewports = [vk::Viewport {
-            x: 0.0,
-            y: 0.0,
-            width: swapchain.resolution().width as f32,
-            height: swapchain.resolution().height as f32,
-            min_depth: 0.0,
-            max_depth: 1.0,
-        }];
 
-        let scissors = [swapchain.resolution().into()];
         let viewport_state_info = vk::PipelineViewportStateCreateInfo::default()
-            .scissors(&scissors)
-            .viewports(&viewports);
+            .scissors(&[])
+            .viewports(&[]);
 
         let rasterization_info = vk::PipelineRasterizationStateCreateInfo {
             front_face: vk::FrontFace::COUNTER_CLOCKWISE,
             line_width: 1.0,
             polygon_mode: vk::PolygonMode::FILL,
+            cull_mode: vk::CullModeFlags::BACK,
             ..Default::default()
         };
         let multisample_state_info = vk::PipelineMultisampleStateCreateInfo {
@@ -233,72 +214,20 @@ impl PipelineGraphics {
 
         let graphic_pipeline = graphics_pipelines[0];
 
-        let framebuffers: Vec<vk::Framebuffer> = swapchain
-            .image_views
-            .iter()
-            .map(|&present_image_view| {
-                let framebuffer_attachments = [present_image_view, swapchain.depth_image_view];
-                let res = swapchain.resolution();
-                let frame_buffer_create_info = vk::FramebufferCreateInfo::default()
-                    .render_pass(renderpass)
-                    .attachments(&framebuffer_attachments)
-                    .width(res.width)
-                    .height(res.height)
-                    .layers(1);
-
-                unsafe {
-                    device
-                        .as_raw()
-                        .create_framebuffer(&frame_buffer_create_info, None)
-                }
-                .unwrap()
-            })
-            .collect();
-
-        let vertices = [
-            Vertex {
-                pos: [-1.0, 1.0, 0.0, 1.0],
-                color: [0.0, 1.0, 0.0, 1.0],
-            },
-            Vertex {
-                pos: [1.0, 1.0, 0.0, 1.0],
-                color: [0.0, 0.0, 1.0, 1.0],
-            },
-            Vertex {
-                pos: [0.0, -1.0, 0.0, 1.0],
-                color: [1.0, 0.0, 0.0, 1.0],
-            },
-        ];
-
-        let vertex_buffer = Subbuffer::from_data(
-            device.clone(),
-            vk::BufferCreateInfo {
-                size: std::mem::size_of_val(&vertices) as u64,
-                usage: vk::BufferUsageFlags::VERTEX_BUFFER,
-                ..Default::default()
-            },
-            vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
-            &vertices,
-        )
-        .unwrap();
-
         PipelineGraphics {
             device,
-            vertex_buffer,
-            swapchain,
-            framebuffers,
             renderpass,
-            viewports,
-            scissors,
             layout: pipeline_layout,
             intern: graphic_pipeline,
         }
     }
 
-    pub unsafe fn draw(&self, command_buffer: &CommandBuffer, present_index: u32) {
-        let device = self.device.as_raw();
-        let command_buffer = command_buffer.as_raw();
-
+    pub unsafe fn draw(
+        &self,
+        command_buffer: &CommandBuffer,
+        frame_buffer: Arc<crate::instances::Framebuffer>,
+        vertex_buffers: &[Arc<dyn BufferAllocation>],
+    ) {
         let clear_values = [
             vk::ClearValue {
                 color: vk::ClearColorValue {
@@ -313,33 +242,38 @@ impl PipelineGraphics {
             },
         ];
 
+        let viewport = pipeline_create_info::ViewportMode::Relative(1.0, 1.0, 1.0, 1.0);
+
+        let scissors = [frame_buffer.size().into()];
+        let viewports = [viewport.get_size(frame_buffer.size().into())];
+
         let render_pass_begin_info = vk::RenderPassBeginInfo::default()
             .render_pass(self.renderpass)
-            .framebuffer(self.framebuffers[present_index as usize])
-            .render_area(self.swapchain.resolution().into())
+            .framebuffer(frame_buffer.as_raw())
+            .render_area(frame_buffer.size().into())
             .clear_values(&clear_values);
 
-        device.cmd_begin_render_pass(
-            command_buffer,
-            &render_pass_begin_info,
-            vk::SubpassContents::INLINE,
-        );
-        device.cmd_bind_pipeline(command_buffer, vk::PipelineBindPoint::GRAPHICS, self.intern);
-        device.cmd_set_viewport(command_buffer, 0, &self.viewports);
-        device.cmd_set_scissor(command_buffer, 0, &self.scissors);
-        device.cmd_bind_vertex_buffers(command_buffer, 0, &[self.vertex_buffer.buffer_raw()], &[0]);
-        device.cmd_draw(command_buffer, 3, 1, 0, 0);
-        device.cmd_end_render_pass(command_buffer);
+        command_buffer.begin_render_pass(&render_pass_begin_info, vk::SubpassContents::INLINE);
+        command_buffer.bind_pipeline(self);
+        command_buffer.set_viewport(0, &viewports);
+        command_buffer.set_scissor(0, &scissors);
+
+        command_buffer.bind_vertex_buffers(0, vertex_buffers, &[0]);
+        command_buffer.draw(3, 2, 0, 0);
+        command_buffer.end_render_pass();
     }
 }
 
-impl PipelineGraphics {
-    pub fn layout(&self) -> vk::PipelineLayout {
-        self.layout.clone()
+impl super::Pipeline for PipelineGraphics {
+    fn bind_point(&self) -> vk::PipelineBindPoint {
+        vk::PipelineBindPoint::GRAPHICS
+    }
+    fn layout(&self) -> vk::PipelineLayout {
+        self.layout
     }
 
-    pub fn as_raw(&self) -> vk::Pipeline {
-        self.intern.clone()
+    fn as_raw(&self) -> vk::Pipeline {
+        self.intern
     }
 }
 

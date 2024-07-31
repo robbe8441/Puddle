@@ -1,10 +1,11 @@
+use super::pipeline::Pipeline;
 use crate::instances::BufferAllocation;
 use anyhow::{Context, Result};
 use std::sync::Arc;
 
 use ash::vk::{self, CommandPoolCreateFlags};
 
-use super::{compute::PipelineCompute, Subbuffer};
+use super::Subbuffer;
 
 pub struct CommandPool {
     intern: vk::CommandPool,
@@ -63,18 +64,18 @@ impl CommandBuffer {
     pub fn as_raw(&self) -> vk::CommandBuffer {
         self.intern.clone()
     }
-    fn device_raw(&self) -> ash::Device {
+    fn device_raw(&self) -> &ash::Device {
         self.pool.device.as_raw()
     }
 
-    pub fn begin(&self, begin_info: vk::CommandBufferUsageFlags) -> Result<()> {
+    pub fn begin(&self, begin_info: vk::CommandBufferUsageFlags) {
         unsafe {
             self.device_raw().begin_command_buffer(
                 self.intern,
                 &vk::CommandBufferBeginInfo::default().flags(begin_info),
             )
-        }?;
-        Ok(())
+        }
+        .unwrap();
     }
 
     pub fn end(&self) {
@@ -88,11 +89,6 @@ impl CommandBuffer {
         data: &[T],
     ) {
         let data = bytemuck::cast_slice(data);
-
-        if std::mem::size_of_val(data) as u64 > buffer.size() - offset {
-            panic!("the data exeeds the max limit of this buffer");
-        }
-
         unsafe {
             self.device_raw().cmd_update_buffer(
                 self.intern,
@@ -103,11 +99,11 @@ impl CommandBuffer {
         };
     }
 
-    pub fn bind_pipeline_compute(&self, pipeline: Arc<PipelineCompute>) {
+    pub fn bind_pipeline(&self, pipeline: &impl Pipeline) {
         unsafe {
             self.device_raw().cmd_bind_pipeline(
                 self.intern,
-                vk::PipelineBindPoint::COMPUTE,
+                pipeline.bind_point(),
                 pipeline.as_raw(),
             )
         };
@@ -117,17 +113,17 @@ impl CommandBuffer {
         &self,
         set: Arc<crate::instances::descriptors::DescriptorSet>,
         first_set: u32,
-        pipeline_layout: vk::PipelineLayout,
-        bind_point: vk::PipelineBindPoint,
+        pipeline: &impl Pipeline,
+        offsets: &[u32],
     ) {
         unsafe {
             self.device_raw().cmd_bind_descriptor_sets(
                 self.intern,
-                bind_point,
-                pipeline_layout,
+                pipeline.bind_point(),
+                pipeline.layout(),
                 first_set,
                 &set.as_raw(),
-                &[],
+                offsets,
             )
         };
     }
@@ -136,6 +132,66 @@ impl CommandBuffer {
         unsafe {
             self.device_raw().cmd_dispatch(self.intern, x, y, z);
         };
+    }
+
+    pub fn set_viewport(&self, first_viewport: u32, viewports: &[vk::Viewport]) {
+        unsafe {
+            self.device_raw()
+                .cmd_set_viewport(self.intern, first_viewport, viewports)
+        };
+    }
+
+    pub fn set_scissor(&self, first_scissor: u32, scissors: &[vk::Rect2D]) {
+        unsafe {
+            self.device_raw()
+                .cmd_set_scissor(self.intern, first_scissor, scissors)
+        };
+    }
+
+    pub fn bind_vertex_buffers(
+        &self,
+        first_binding: u32,
+        buffers: &[Arc<dyn BufferAllocation>],
+        offsets: &[u64],
+    ) {
+        let buffers: Vec<_> = buffers.iter().map(|v| v.buffer_raw()).collect();
+
+        unsafe {
+            self.device_raw()
+                .cmd_bind_vertex_buffers(self.intern, first_binding, &buffers, offsets)
+        };
+    }
+
+    pub fn draw(
+        &self,
+        vertex_count: u32,
+        instance_count: u32,
+        first_vertex: u32,
+        first_instance: u32,
+    ) {
+        unsafe {
+            self.device_raw().cmd_draw(
+                self.intern,
+                vertex_count,
+                instance_count,
+                first_vertex,
+                first_instance,
+            )
+        }
+    }
+
+    pub fn begin_render_pass(
+        &self,
+        begin_info: &vk::RenderPassBeginInfo,
+        contents: vk::SubpassContents,
+    ) {
+        unsafe {
+            self.device_raw()
+                .cmd_begin_render_pass(self.intern, begin_info, contents)
+        }
+    }
+    pub fn end_render_pass(&self) {
+        unsafe { self.device_raw().cmd_end_render_pass(self.intern) };
     }
 }
 

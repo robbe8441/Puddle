@@ -11,7 +11,11 @@ pub struct PipelineCompute {
 }
 
 impl PipelineCompute {
-    pub fn new(device: Arc<Device>, shader: Arc<ShaderModule>, descriptors: Arc<crate::instances::descriptors::DescriptorSet>) -> Result<Arc<Self>> {
+    pub fn new(
+        device: Arc<Device>,
+        shader: Arc<ShaderModule>,
+        descriptors: Arc<crate::instances::descriptors::DescriptorSet>,
+    ) -> Result<Arc<Self>> {
         let device_raw = device.as_raw();
 
         let mut entry = shader.entry().to_string();
@@ -23,7 +27,8 @@ impl PipelineCompute {
             .name(unsafe { CStr::from_bytes_with_nul_unchecked(entry.as_bytes()) });
 
         let descriptor_layouts = descriptors.layout();
-        let layout_create_info = vk::PipelineLayoutCreateInfo::default().set_layouts(&descriptor_layouts);
+        let layout_create_info =
+            vk::PipelineLayoutCreateInfo::default().set_layouts(&descriptor_layouts);
 
         let layout = unsafe { device_raw.create_pipeline_layout(&layout_create_info, None) }?;
 
@@ -42,13 +47,18 @@ impl PipelineCompute {
             device,
         }))
     }
+}
 
-    pub fn layout(&self) -> vk::PipelineLayout {
-        self.layout.clone()
+impl super::Pipeline for PipelineCompute {
+    fn bind_point(&self) -> vk::PipelineBindPoint {
+        vk::PipelineBindPoint::COMPUTE
+    }
+    fn layout(&self) -> vk::PipelineLayout {
+        self.layout
     }
 
-    pub fn as_raw(&self) -> vk::Pipeline {
-        self.intern.clone()
+    fn as_raw(&self) -> vk::Pipeline {
+        self.intern
     }
 }
 

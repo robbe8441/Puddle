@@ -40,7 +40,6 @@ unsafe extern "system" fn vulkan_debug_callback(
 
 impl VkDebugger {
     pub fn new(instance: Arc<super::Instance>) -> Self {
-
         let debug_info = vk::DebugUtilsMessengerCreateInfoEXT::default()
             .message_severity(
                 vk::DebugUtilsMessageSeverityFlagsEXT::ERROR

@@ -61,4 +61,3 @@ impl Drop for RawBuffer {
         unsafe { self.device.as_raw().destroy_buffer(self.intern, None) };
     }
 }
-

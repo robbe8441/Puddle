@@ -1,5 +1,5 @@
-use std::sync::Arc;
 use ash::vk;
+use std::sync::Arc;
 
 #[allow(unused)]
 pub struct Queue {
@@ -17,5 +17,3 @@ impl Queue {
         self.intern.clone()
     }
 }
-
-

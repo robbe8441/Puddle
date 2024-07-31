@@ -10,7 +10,11 @@ pub struct DescriptorPool {
 }
 
 impl DescriptorPool {
-    pub fn new(device: Arc<Device>, sizes: &[vk::DescriptorPoolSize], max_sets: u32) -> Result<Arc<Self>> {
+    pub fn new(
+        device: Arc<Device>,
+        sizes: &[vk::DescriptorPoolSize],
+        max_sets: u32,
+    ) -> Result<Arc<Self>> {
         let create_info = vk::DescriptorPoolCreateInfo::default()
             .pool_sizes(sizes)
             .max_sets(max_sets);

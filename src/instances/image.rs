@@ -8,6 +8,7 @@ pub struct Image {
     intern: vk::Image,
     memory: Arc<DeviceMemory>,
     device: Arc<super::Device>,
+    layout: vk::ImageLayout,
 }
 
 impl Image {
@@ -18,12 +19,17 @@ impl Image {
 
         let memory_req = unsafe { device_raw.get_image_memory_requirements(image) };
 
-        let memory = DeviceMemory::new(device.clone(), vk::MemoryPropertyFlags::DEVICE_LOCAL, memory_req)?;
+        let memory = DeviceMemory::new(
+            device.clone(),
+            vk::MemoryPropertyFlags::DEVICE_LOCAL,
+            memory_req,
+        )?;
 
         unsafe { device_raw.bind_image_memory(image, memory.as_raw(), 0) }?;
 
         Ok(Arc::new(Self {
             intern: image,
+            layout: create_info.initial_layout,
             memory,
             device,
         }))

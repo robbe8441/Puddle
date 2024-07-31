@@ -1,8 +1,8 @@
 use std::sync::Arc;
 
+use crate::instances::Device;
 use anyhow::{Context, Result};
 use ash::vk;
-use crate::instances::Device;
 
 pub struct ShaderModule {
     intern: vk::ShaderModule,
@@ -22,7 +22,7 @@ impl Into<vk::ShaderStageFlags> for ShaderKind {
     fn into(self) -> vk::ShaderStageFlags {
         match self {
             Self::Compute => vk::ShaderStageFlags::COMPUTE,
-            Self::Fragment => vk::ShaderStageFlags::FRAGMENT, 
+            Self::Fragment => vk::ShaderStageFlags::FRAGMENT,
             Self::Vertex => vk::ShaderStageFlags::VERTEX,
         }
     }
@@ -38,10 +38,16 @@ impl Into<shaderc::ShaderKind> for ShaderKind {
 }
 
 impl ShaderModule {
-    pub fn from_source(device: Arc<Device>,source: &str, shader_kind: ShaderKind, entry: &'static str) -> Result<Arc<Self>> {
+    pub fn from_source(
+        device: Arc<Device>,
+        source: &str,
+        shader_kind: ShaderKind,
+        entry: &'static str,
+    ) -> Result<Arc<Self>> {
         let compiler = shaderc::Compiler::new().context("failed to create compiler")?;
 
-        let code = compiler.compile_into_spirv(source, shader_kind.into(), "shader", entry, None)?;
+        let code =
+            compiler.compile_into_spirv(source, shader_kind.into(), "shader", entry, None)?;
 
         let create_info = vk::ShaderModuleCreateInfo::default().code(code.as_binary());
 
@@ -68,6 +74,10 @@ impl ShaderModule {
 
 impl Drop for ShaderModule {
     fn drop(&mut self) {
-        unsafe { self.device.as_raw().destroy_shader_module(self.intern, None) };
+        unsafe {
+            self.device
+                .as_raw()
+                .destroy_shader_module(self.intern, None)
+        };
     }
 }

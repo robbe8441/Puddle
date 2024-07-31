@@ -1,11 +1,13 @@
-use super::{descriptor_pool::DescriptorPool, WriteDescriptorSet};
 use anyhow::Result;
 use ash::vk::{self, ShaderStageFlags};
 use std::sync::Arc;
 
+use super::DescriptorPool;
+
 pub struct DescriptorSet {
     intern: Vec<vk::DescriptorSet>,
     layout: Vec<vk::DescriptorSetLayout>,
+    pool : Arc<DescriptorPool>,
 }
 
 impl DescriptorSet {
@@ -62,6 +64,7 @@ impl DescriptorSet {
         Ok(Arc::new(Self {
             intern: descriptor_sets,
             layout: desc_set_layouts.into(),
+            pool,
         }))
     }
 

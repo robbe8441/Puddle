@@ -3,20 +3,25 @@ use std::sync::Arc;
 use anyhow::Result;
 use ash::{khr::swapchain, vk};
 
+#[allow(unused)]
 pub struct Swapchain {
     intern: vk::SwapchainKHR,
     loader: swapchain::Device,
-    pub images: Vec<vk::Image>,
-    pub image_views: Vec<vk::ImageView>,
     format: vk::SurfaceFormatKHR,
     resolution: vk::Extent2D,
     device: Arc<super::Device>,
+    pub images: Arc<[vk::Image]>,
+    pub image_views: Arc<[vk::ImageView]>,
     pub depth_image_view: vk::ImageView,
     depth_image: Arc<super::Image>,
 }
 
 impl Swapchain {
-    pub fn new(device: Arc<super::Device>, surface: Arc<super::Surface>) -> Result<Arc<Self>> {
+    pub fn new(
+        device: Arc<super::Device>,
+        surface: Arc<super::Surface>,
+        size: [u32; 2],
+    ) -> Result<Arc<Self>> {
         let surface_loader = surface.loader();
         let pdevice = device.physical_device();
 
@@ -36,8 +41,8 @@ impl Swapchain {
         }
         let surface_resolution = match surface_capabilities.current_extent.width {
             u32::MAX => vk::Extent2D {
-                width: 600,
-                height: 400,
+                width: size[0],
+                height: size[1],
             },
             _ => surface_capabilities.current_extent,
         };
@@ -58,16 +63,17 @@ impl Swapchain {
             .min_by_key(|v| match v {
                 &vk::PresentModeKHR::MAILBOX => 1,
                 &vk::PresentModeKHR::FIFO_RELAXED => 2,
-                &vk::PresentModeKHR::FIFO => 3,
+                &vk::PresentModeKHR::FIFO => 0,
                 _ => 4,
             })
             .unwrap();
+        dbg!(present_mode);
 
         let swapchain_create_info = vk::SwapchainCreateInfoKHR::default()
             .surface(surface.as_raw())
             .min_image_count(desired_image_count)
             .image_color_space(surface_format.color_space)
-            .image_format(dbg!(surface_format.format))
+            .image_format(surface_format.format)
             .image_extent(surface_resolution)
             .image_usage(vk::ImageUsageFlags::COLOR_ATTACHMENT)
             .image_sharing_mode(vk::SharingMode::EXCLUSIVE)
@@ -139,10 +145,10 @@ impl Swapchain {
         .unwrap();
 
         Ok(Arc::new(Self {
-            intern: swapchain,
+            intern: swapchain.into(),
             loader: swapchain_loader,
-            images: present_images,
-            image_views: present_image_views,
+            images: present_images.into(),
+            image_views: present_image_views.into(),
             format: surface_format,
             resolution: surface_resolution,
             depth_image_view,

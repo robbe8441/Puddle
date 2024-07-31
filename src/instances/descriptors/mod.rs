@@ -12,7 +12,6 @@ pub use descriptor_set::*;
 
 pub use vk::DescriptorPoolSize;
 
-
 #[allow(unused)]
 pub enum DescriptorType {
     UniformBuffer,
@@ -22,7 +21,7 @@ pub enum DescriptorType {
     UniformTexelBuffer,
 }
 
-pub struct  WriteDescriptorSet<'a> {
+pub struct WriteDescriptorSet<'a> {
     pub buffer_info: Option<&'a [vk::DescriptorBufferInfo]>,
     pub image_info: Option<&'a [vk::DescriptorImageInfo]>,
     pub dst_binding: u32,
@@ -30,8 +29,6 @@ pub struct  WriteDescriptorSet<'a> {
     pub dst_set: u32,
     pub descriptor_type: vk::DescriptorType,
 }
-
-
 
 impl Into<vk::DescriptorType> for DescriptorType {
     fn into(self) -> vk::DescriptorType {
