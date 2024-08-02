@@ -70,13 +70,11 @@ fn compute_pipeline() {
     let pipeline =
         compute::PipelineCompute::new(device.clone(), shader, descriptor_set.clone()).unwrap();
 
-    command_buffer
-        .begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
-        .unwrap();
+    command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
-    command_buffer.bind_pipeline_compute(pipeline.clone());
+    command_buffer.bind_pipeline(pipeline.clone());
 
-    command_buffer.bind_descriptor_set(descriptor_set, pipeline);
+    command_buffer.bind_descriptor_set(descriptor_set, 0, pipeline.clone(), &[0]);
 
     command_buffer.dispatch(1, 1, 1);
 

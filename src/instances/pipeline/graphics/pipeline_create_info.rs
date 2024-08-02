@@ -1,9 +1,6 @@
-use std::sync::Arc;
-
 use ash::vk;
 
-use crate::instances::*;
-
+#[allow(unused)]
 pub enum CullMode {
     Front,
     Back,
@@ -32,6 +29,7 @@ pub enum VertexInputBinding {
 }
 
 #[derive(Clone, Copy, Debug)]
+#[allow(unused)]
 pub enum ViewportMode {
     // viewpoer is relative to the window size 
     // 1.0 would fill the whole wndow
@@ -95,13 +93,4 @@ impl Into<vk::VertexInputBindingDescription> for VertexInputBinding {
             },
         }
     }
-}
-
-pub struct PipelineCreateInfo {
-    cull_mode: CullMode,
-    shader_stages: Arc<[ShaderModule]>,
-    vertex_inputs: Arc<[VertexInputBinding]>,
-    vertex_inputs_attributes: Arc<[vk::VertexInputAttributeDescription]>,
-    dynamic_states: Arc<[vk::DynamicState]>,
-    viewport: ViewportMode,
 }

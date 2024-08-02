@@ -34,9 +34,7 @@ pub fn allocate_buffer() {
 
     assert_eq!(subbuffer.read().unwrap(), data2);
 
-    command_buffer
-        .begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT)
-        .unwrap();
+    command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
     let val = [1000, 254, 253];
 

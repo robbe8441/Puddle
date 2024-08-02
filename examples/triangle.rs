@@ -1,19 +1,20 @@
 use anyhow::Result;
 use ash::vk;
 use descriptors::{DescriptorPool, DescriptorSet, WriteDescriptorSet};
-use glam::{Mat4, Vec4Swizzles};
 use graphics::PipelineGraphics;
 use std::{sync::Arc, time::Instant};
 
 use vk_render::{
     instances::*,
-    types::{Transform, Vertex},
+    types::Vertex,
 };
 use winit::{
     event::{Event, WindowEvent},
     event_loop::EventLoop,
     window::WindowBuilder,
 };
+
+
 
 fn main() -> Result<()> {
     let event_loop = EventLoop::new()?;
@@ -55,7 +56,7 @@ fn main() -> Result<()> {
     let instance_buffer: Arc<Subbuffer<[f32; 4]>> = Subbuffer::from_data(
         device.clone(),
         vk::BufferCreateInfo {
-            size: std::mem::size_of_val(&vertices) as u64,
+            size: std::mem::size_of_val(&instances) as u64,
             usage: vk::BufferUsageFlags::UNIFORM_BUFFER,
             ..Default::default()
         },
@@ -97,7 +98,7 @@ fn main() -> Result<()> {
             let framebuffer_attachments = [present_image_view, swapchain.depth_image_view];
             let res = swapchain.resolution();
             let frame_buffer_create_info = vk::FramebufferCreateInfo::default()
-                .render_pass(pipeline.renderpass)
+                .render_pass(pipeline.render_pass.as_raw())
                 .attachments(&framebuffer_attachments)
                 .width(res.width)
                 .height(res.height)
@@ -136,13 +137,14 @@ fn main() -> Result<()> {
 
                 command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
-                command_buffer.bind_descriptor_set(model_matrix.clone(), 0, &pipeline, &[0]);
+                command_buffer.bind_descriptor_set(model_matrix.clone(), 0, pipeline.clone(), &[0]);
 
                 // println!("fps {}", 1.0 / delta.elapsed().as_secs_f64());
                 delta = Instant::now();
 
                 unsafe {
-                    pipeline.draw(
+                    graphics::draw(
+                        pipeline.clone(),
                         &command_buffer,
                         framebuffers[image_index as usize].clone(),
                         &[vertex_buffer.clone()],
@@ -172,7 +174,7 @@ fn main() -> Result<()> {
                             [present_image_view, swapchain.depth_image_view];
                         let res = swapchain.resolution();
                         let frame_buffer_create_info = vk::FramebufferCreateInfo::default()
-                            .render_pass(pipeline.renderpass)
+                            .render_pass(pipeline.render_pass.as_raw())
                             .attachments(&framebuffer_attachments)
                             .width(res.width)
                             .height(res.height)

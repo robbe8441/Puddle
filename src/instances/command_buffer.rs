@@ -99,7 +99,7 @@ impl CommandBuffer {
         };
     }
 
-    pub fn bind_pipeline(&self, pipeline: &impl Pipeline) {
+    pub fn bind_pipeline(&self, pipeline: Arc<dyn Pipeline>) {
         unsafe {
             self.device_raw().cmd_bind_pipeline(
                 self.intern,
@@ -113,7 +113,7 @@ impl CommandBuffer {
         &self,
         set: Arc<crate::instances::descriptors::DescriptorSet>,
         first_set: u32,
-        pipeline: &impl Pipeline,
+        pipeline: Arc<dyn Pipeline>,
         offsets: &[u32],
     ) {
         unsafe {

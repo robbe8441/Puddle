@@ -415,26 +415,6 @@ impl Transform {
     /// * if `main_axis` is parallel with `secondary_axis` or `main_direction` is parallel with `secondary_direction`,
     ///     a rotation is constructed which takes `main_axis` to `main_direction` along a great circle, ignoring the secondary
     ///     counterparts
-    ///
-    /// Example
-    /// ```
-    /// # use bevy_math::{Vec3, Vec3, Quat};
-    /// # use bevy_transform::components::Transform;
-    /// # let mut t1 = Transform::IDENTITY;
-    /// # let mut t2 = Transform::IDENTITY;
-    /// t1.align(Vec3::X, Dir3::Y, Vec3::new(1., 1., 0.), Dir3::Z);
-    /// let main_axis_image = t1.rotation * Vec3::X;
-    /// let secondary_axis_image = t1.rotation * Vec3::new(1., 1., 0.);
-    /// assert!(main_axis_image.abs_diff_eq(Vec3::Y, 1e-5));
-    /// assert!(secondary_axis_image.abs_diff_eq(Vec3::new(0., 1., 1.), 1e-5));
-    ///
-    /// t1.align(Vec3::ZERO, Vec3::Z, Vec3::ZERO, Dir3::X);
-    /// t2.align(Vec3::X, Dir3::Z, Dir3::Y, Dir3::X);
-    /// assert_eq!(t1.rotation, t2.rotation);
-    ///
-    /// t1.align(Vec3::X, Dir3::Z, Dir3::X, Dir3::Y);
-    /// assert_eq!(t1.rotation, Quat::from_rotation_arc(Vec3::X, Vec3::Z));
-    /// ```
     #[inline]
     pub fn align(
         &mut self,

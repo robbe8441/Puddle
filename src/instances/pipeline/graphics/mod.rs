@@ -10,72 +10,20 @@ use std::{ffi::CStr, sync::Arc};
 
 pub struct PipelineGraphics {
     intern: vk::Pipeline,
-    pub renderpass: vk::RenderPass,
+    pub render_pass: Arc<render_pass::RenderPass>,
     layout: vk::PipelineLayout,
     device: Arc<Device>,
 }
 
 impl PipelineGraphics {
 
-    pub fn new(create_info: &pipeline_create_info::PipelineCreateInfo, layout: vk::PipelineLayout ) {
+    // pub fn new(create_info: &pipeline_create_info::PipelineCreateInfo, layout: vk::PipelineLayout ) {
+    //
+    // }
 
-    }
+    pub fn test(device: Arc<Device>, format: vk::Format, descriptors: Arc<crate::instances::descriptors::DescriptorSet>) -> Arc<PipelineGraphics> {
 
-    pub fn test(device: Arc<Device>, format: vk::Format, descriptors: Arc<crate::instances::descriptors::DescriptorSet>) -> PipelineGraphics {
-        let renderpass_attachments = [
-            vk::AttachmentDescription {
-                format,
-                samples: vk::SampleCountFlags::TYPE_1,
-                load_op: vk::AttachmentLoadOp::CLEAR,
-                store_op: vk::AttachmentStoreOp::STORE,
-                final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
-                ..Default::default()
-            },
-            vk::AttachmentDescription {
-                format: vk::Format::D16_UNORM,
-                samples: vk::SampleCountFlags::TYPE_1,
-                load_op: vk::AttachmentLoadOp::CLEAR,
-                initial_layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                final_layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-                ..Default::default()
-            },
-        ];
-
-        let color_attachment_refs = [vk::AttachmentReference {
-            attachment: 0,
-            layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-        }];
-
-        let depth_attachment_ref = vk::AttachmentReference {
-            attachment: 1,
-            layout: vk::ImageLayout::DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-        };
-
-        let dependencies = [vk::SubpassDependency {
-            src_subpass: vk::SUBPASS_EXTERNAL,
-            src_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-            dst_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_READ
-                | vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
-            dst_stage_mask: vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
-            ..Default::default()
-        }];
-
-        let subpass = vk::SubpassDescription::default()
-            .color_attachments(&color_attachment_refs)
-            .depth_stencil_attachment(&depth_attachment_ref)
-            .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS);
-
-        let renderpass_create_info = vk::RenderPassCreateInfo::default()
-            .attachments(&renderpass_attachments)
-            .subpasses(std::slice::from_ref(&subpass))
-            .dependencies(&dependencies);
-
-        let renderpass = unsafe {
-            device
-                .as_raw()
-                .create_render_pass(&renderpass_create_info, None)
-        }
-        .unwrap();
+        let render_pass = render_pass::RenderPass::new_deafult(device.clone(), format).unwrap();
 
         let vertex_shader = ShaderModule::from_source(
             device.clone(),
@@ -131,7 +79,6 @@ impl PipelineGraphics {
         ];
 
         let vertex_input_attribute_descriptions = [Vertex::desc()];
-
 
         let vertex_input_state_info = vk::PipelineVertexInputStateCreateInfo::default()
             .vertex_attribute_descriptions(&vertex_input_attribute_descriptions)
@@ -201,7 +148,7 @@ impl PipelineGraphics {
             .color_blend_state(&color_blend_state)
             .dynamic_state(&dynamic_state_info)
             .layout(pipeline_layout)
-            .render_pass(renderpass);
+            .render_pass(render_pass.as_raw());
 
         let graphics_pipelines = unsafe {
             device.as_raw().create_graphics_pipelines(
@@ -216,52 +163,52 @@ impl PipelineGraphics {
 
         PipelineGraphics {
             device,
-            renderpass,
+            render_pass,
             layout: pipeline_layout,
             intern: graphic_pipeline,
-        }
+        }.into()
     }
 
-    pub unsafe fn draw(
-        &self,
-        command_buffer: &CommandBuffer,
-        frame_buffer: Arc<crate::instances::Framebuffer>,
-        vertex_buffers: &[Arc<dyn BufferAllocation>],
-    ) {
-        let clear_values = [
-            vk::ClearValue {
-                color: vk::ClearColorValue {
-                    float32: [0.1, 0.1, 0.1, 0.0],
-                },
+}
+pub unsafe fn draw(
+    pipeline: Arc<PipelineGraphics>,
+    command_buffer: &CommandBuffer,
+    frame_buffer: Arc<crate::instances::Framebuffer>,
+    vertex_buffers: &[Arc<dyn BufferAllocation>],
+) {
+    let clear_values = [
+        vk::ClearValue {
+            color: vk::ClearColorValue {
+                float32: [0.1, 0.1, 0.1, 0.0],
             },
-            vk::ClearValue {
-                depth_stencil: vk::ClearDepthStencilValue {
-                    depth: 1.0,
-                    stencil: 0,
-                },
+        },
+        vk::ClearValue {
+            depth_stencil: vk::ClearDepthStencilValue {
+                depth: 1.0,
+                stencil: 0,
             },
-        ];
+        },
+    ];
 
-        let viewport = pipeline_create_info::ViewportMode::Relative(1.0, 1.0, 1.0, 1.0);
+    let viewport = pipeline_create_info::ViewportMode::Relative(0.25, 0.25, 0.5, 0.5);
 
-        let scissors = [frame_buffer.size().into()];
-        let viewports = [viewport.get_size(frame_buffer.size().into())];
+    let scissors = [frame_buffer.size().into()];
+    let viewports = [viewport.get_size(frame_buffer.size().into())];
 
-        let render_pass_begin_info = vk::RenderPassBeginInfo::default()
-            .render_pass(self.renderpass)
-            .framebuffer(frame_buffer.as_raw())
-            .render_area(frame_buffer.size().into())
-            .clear_values(&clear_values);
+    let render_pass_begin_info = vk::RenderPassBeginInfo::default()
+        .render_pass(pipeline.render_pass.as_raw())
+        .framebuffer(frame_buffer.as_raw())
+        .render_area(frame_buffer.size().into())
+        .clear_values(&clear_values);
 
-        command_buffer.begin_render_pass(&render_pass_begin_info, vk::SubpassContents::INLINE);
-        command_buffer.bind_pipeline(self);
-        command_buffer.set_viewport(0, &viewports);
-        command_buffer.set_scissor(0, &scissors);
+    command_buffer.begin_render_pass(&render_pass_begin_info, vk::SubpassContents::INLINE);
+    command_buffer.bind_pipeline(pipeline);
+    command_buffer.set_viewport(0, &viewports);
+    command_buffer.set_scissor(0, &scissors);
 
-        command_buffer.bind_vertex_buffers(0, vertex_buffers, &[0]);
-        command_buffer.draw(3, 2, 0, 0);
-        command_buffer.end_render_pass();
-    }
+    command_buffer.bind_vertex_buffers(0, vertex_buffers, &[0]);
+    command_buffer.draw(3, 2, 0, 0);
+    command_buffer.end_render_pass();
 }
 
 impl super::Pipeline for PipelineGraphics {
