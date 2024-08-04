@@ -16,13 +16,15 @@ pub struct PipelineGraphics {
 }
 
 impl PipelineGraphics {
-
     // pub fn new(create_info: &pipeline_create_info::PipelineCreateInfo, layout: vk::PipelineLayout ) {
     //
     // }
 
-    pub fn test(device: Arc<Device>, format: vk::Format, descriptors: Arc<crate::instances::descriptors::DescriptorSet>) -> Arc<PipelineGraphics> {
-
+    pub fn test(
+        device: Arc<Device>,
+        format: vk::Format,
+        descriptors: Arc<crate::instances::descriptors::DescriptorSet>,
+    ) -> Arc<PipelineGraphics> {
         let render_pass = render_pass::RenderPass::new_deafult(device.clone(), format).unwrap();
 
         let vertex_shader = ShaderModule::from_source(
@@ -70,13 +72,11 @@ impl PipelineGraphics {
         }
         .unwrap();
 
-        let vertex_input_binding_descriptions = [
-            vk::VertexInputBindingDescription {
-                binding: 0,
-                stride: std::mem::size_of::<Vertex>() as u32,
-                input_rate: vk::VertexInputRate::VERTEX,
-            },
-        ];
+        let vertex_input_binding_descriptions = [vk::VertexInputBindingDescription {
+            binding: 0,
+            stride: std::mem::size_of::<Vertex>() as u32,
+            input_rate: vk::VertexInputRate::VERTEX,
+        }];
 
         let vertex_input_attribute_descriptions = [Vertex::desc()];
 
@@ -96,7 +96,7 @@ impl PipelineGraphics {
             front_face: vk::FrontFace::COUNTER_CLOCKWISE,
             line_width: 1.0,
             polygon_mode: vk::PolygonMode::FILL,
-            cull_mode: vk::CullModeFlags::BACK,
+            cull_mode: vk::CullModeFlags::FRONT,
             ..Default::default()
         };
         let multisample_state_info = vk::PipelineMultisampleStateCreateInfo {
@@ -119,20 +119,21 @@ impl PipelineGraphics {
             max_depth_bounds: 1.0,
             ..Default::default()
         };
+
         let color_blend_attachment_states = [vk::PipelineColorBlendAttachmentState {
-            blend_enable: 0,
-            src_color_blend_factor: vk::BlendFactor::SRC_COLOR,
-            dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_DST_COLOR,
+            blend_enable: vk::TRUE,
+            src_color_blend_factor: vk::BlendFactor::SRC_ALPHA,
+            dst_color_blend_factor: vk::BlendFactor::ONE_MINUS_SRC_ALPHA,
             color_blend_op: vk::BlendOp::ADD,
-            src_alpha_blend_factor: vk::BlendFactor::ZERO,
+            src_alpha_blend_factor: vk::BlendFactor::ONE,
             dst_alpha_blend_factor: vk::BlendFactor::ZERO,
             alpha_blend_op: vk::BlendOp::ADD,
             color_write_mask: vk::ColorComponentFlags::RGBA,
         }];
-        let color_blend_state = vk::PipelineColorBlendStateCreateInfo::default()
-            .logic_op(vk::LogicOp::CLEAR)
-            .attachments(&color_blend_attachment_states);
 
+        let color_blend_state = vk::PipelineColorBlendStateCreateInfo::default()
+            .logic_op_enable(false)
+            .attachments(&color_blend_attachment_states);
         let dynamic_state = [vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR];
         let dynamic_state_info =
             vk::PipelineDynamicStateCreateInfo::default().dynamic_states(&dynamic_state);
@@ -166,9 +167,9 @@ impl PipelineGraphics {
             render_pass,
             layout: pipeline_layout,
             intern: graphic_pipeline,
-        }.into()
+        }
+        .into()
     }
-
 }
 pub unsafe fn draw(
     pipeline: Arc<PipelineGraphics>,
@@ -207,7 +208,12 @@ pub unsafe fn draw(
     command_buffer.set_scissor(0, &scissors);
 
     command_buffer.bind_vertex_buffers(0, vertex_buffers, &[0]);
-    command_buffer.draw(3, 2, 0, 0);
+    command_buffer.draw(
+        (vertex_buffers[0].size() as usize / std::mem::size_of::<Vertex>()) as u32,
+        1,
+        0,
+        0,
+    );
     command_buffer.end_render_pass();
 }
 

@@ -31,10 +31,12 @@ impl<T> Subbuffer<T> {
 impl<T: Copy> Subbuffer<T> {
     pub fn from_data(
         device: Arc<Device>,
-        create_info: vk::BufferCreateInfo,
+        mut create_info: vk::BufferCreateInfo,
         property_flags: vk::MemoryPropertyFlags,
         data: &[T],
     ) -> Result<Arc<Subbuffer<T>>> {
+        create_info.size = (std::mem::size_of::<T>() * data.len()) as u64;
+
         let raw_buffer = RawBuffer::new(device, create_info, property_flags)?;
 
         let subbuffer = Subbuffer::from_raw(raw_buffer)?;

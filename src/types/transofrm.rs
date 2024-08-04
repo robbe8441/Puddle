@@ -110,7 +110,6 @@ impl Transform {
         }
     }
 
-
     /// Returns this [`Transform`] with a new rotation so that [`Transform::forward`]
     /// points towards the `target` position and [`Transform::up`] points towards `up`.
     ///
@@ -496,4 +495,5 @@ impl Transform {
     pub fn is_finite(&self) -> bool {
         self.translation.is_finite() && self.rotation.is_finite() && self.scale.is_finite()
     }
+
 }

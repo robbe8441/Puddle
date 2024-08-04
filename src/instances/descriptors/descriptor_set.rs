@@ -2,12 +2,12 @@ use anyhow::Result;
 use ash::vk::{self, ShaderStageFlags};
 use std::sync::Arc;
 
-use super::DescriptorPool;
+use super::{DescriptorPool, WriteDescriptorSet};
 
 pub struct DescriptorSet {
     intern: Vec<vk::DescriptorSet>,
     layout: Vec<vk::DescriptorSetLayout>,
-    pool : Arc<DescriptorPool>,
+    pool: Arc<DescriptorPool>,
 }
 
 impl DescriptorSet {
@@ -66,6 +66,34 @@ impl DescriptorSet {
             layout: desc_set_layouts.into(),
             pool,
         }))
+    }
+
+    pub fn update(&self, writes: &[WriteDescriptorSet]) {
+        let writes: Vec<_> = writes
+            .iter()
+            .map(|write| {
+                let mut vkwrite = vk::WriteDescriptorSet::default()
+                    .dst_binding(write.dst_binding)
+                    .descriptor_count(write.descriptor_count)
+                    .descriptor_type(write.descriptor_type)
+                    .dst_set(self.intern[write.dst_set as usize]);
+
+                if let Some(info) = write.image_info {
+                    vkwrite = vkwrite.image_info(info);
+                } else if let Some(info) = write.buffer_info {
+                    vkwrite = vkwrite.buffer_info(info);
+                }
+
+                vkwrite
+            })
+            .collect();
+
+        unsafe {
+            self.pool
+                .device
+                .as_raw()
+                .update_descriptor_sets(&writes, &[])
+        };
     }
 
     pub fn layout(&self) -> Vec<vk::DescriptorSetLayout> {

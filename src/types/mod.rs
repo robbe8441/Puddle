@@ -1,5 +1,5 @@
-mod vertex;
 mod transofrm;
+mod vertex;
 
-pub use vertex::Vertex;
 pub use transofrm::Transform;
+pub use vertex::*;

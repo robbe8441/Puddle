@@ -1,8 +1,10 @@
 use anyhow::Result;
 use ash::vk;
 use descriptors::{DescriptorPool, DescriptorSet, WriteDescriptorSet};
-use graphics::PipelineGraphics;
+use glam::{Mat4, Quat, Vec3};
 use std::{sync::Arc, time::Instant};
+use vk_render::instances::graphics::PipelineGraphics;
+use vk_render::types::Transform;
 
 use vk_render::{instances::*, types::Vertex};
 use winit::{
@@ -10,6 +12,15 @@ use winit::{
     event_loop::EventLoop,
     window::WindowBuilder,
 };
+
+#[repr(C)]
+#[derive(Clone, Copy, Debug, Default)]
+struct CameraUniform {
+    proj: [[f32;4];4],
+    pos: [f32; 4],
+}
+
+
 
 fn main() -> Result<()> {
     let event_loop = EventLoop::new()?;
@@ -29,30 +40,18 @@ fn main() -> Result<()> {
 
     let command_pool = CommandPool::new(device.clone(), queue.family_index())?;
 
-    let vertices = [
-        Vertex {
-            pos: [-1.0, 1.0, 0.0, 1.0],
-        },
-        Vertex {
-            pos: [1.0, 1.0, 0.0, 1.0],
-        },
-        Vertex {
-            pos: [0.0, -1.0, 0.0, 1.0],
-        },
-    ];
-
     let instances = [
-        glam::Vec4::new(-0.5, 0.0, 0.0, 0.0).to_array(),
-        glam::Vec4::new(0.5, 0.0, 0.0, 0.0).to_array(),
+        Transform::from_xyz(0.0, 0.0, 0.0)
+            // .looking_at(Vec3::ONE.normalize(), Vec3::Y)
+            .with_scale(Vec3::splat(2.0))
+            .compute_matrix()
+            .to_cols_array_2d(),
     ];
 
-    dbg!(&instances);
-
-    let instance_buffer: Arc<Subbuffer<[f32; 4]>> = Subbuffer::from_data(
+    let instance_buffer: Arc<Subbuffer<[[f32; 4]; 4]>> = Subbuffer::from_data(
         device.clone(),
         vk::BufferCreateInfo {
-            size: std::mem::size_of_val(&instances) as u64,
-            usage: vk::BufferUsageFlags::UNIFORM_BUFFER,
+            usage: vk::BufferUsageFlags::STORAGE_BUFFER,
             ..Default::default()
         },
         vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
@@ -60,23 +59,53 @@ fn main() -> Result<()> {
     )
     .unwrap();
 
-    let sizes = [vk::DescriptorPoolSize {
-        ty: vk::DescriptorType::STORAGE_BUFFER,
-        descriptor_count: 1,
-    }];
+    let camera_projection = [CameraUniform::default()];
+
+    let camera_unifrom_buffer: Arc<Subbuffer<CameraUniform>> = Subbuffer::from_data(
+        device.clone(),
+        vk::BufferCreateInfo {
+            usage: vk::BufferUsageFlags::STORAGE_BUFFER,
+            ..Default::default()
+        },
+        vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        &camera_projection,
+    )
+    .unwrap();
+
+    let sizes = [
+        vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::STORAGE_BUFFER,
+            descriptor_count: 1,
+        },
+        vk::DescriptorPoolSize {
+            ty: vk::DescriptorType::STORAGE_BUFFER,
+            descriptor_count: 1,
+        },
+    ];
 
     let descriptor_pool = DescriptorPool::new(device.clone(), &sizes, 1)?;
 
     let buffer_info = [instance_buffer.desc()];
+    let camera_buffer_info = [camera_unifrom_buffer.desc()];
 
-    let writes = [WriteDescriptorSet {
-        buffer_info: Some(&buffer_info),
-        image_info: None,
-        descriptor_count: 1,
-        descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-        dst_binding: 0,
-        dst_set: 0,
-    }];
+    let writes = [
+        WriteDescriptorSet {
+            buffer_info: Some(&buffer_info),
+            image_info: None,
+            descriptor_count: 1,
+            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            dst_binding: 0,
+            dst_set: 0,
+        },
+        WriteDescriptorSet {
+            buffer_info: Some(&camera_buffer_info),
+            image_info: None,
+            descriptor_count: 1,
+            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
+            dst_binding: 1,
+            dst_set: 0,
+        },
+    ];
 
     let model_matrix = DescriptorSet::new(descriptor_pool.clone(), &writes)?;
 
@@ -104,10 +133,11 @@ fn main() -> Result<()> {
         })
         .collect();
 
+    let vertices = read_teapod_file();
+
     let vertex_buffer = Subbuffer::from_data(
         device.clone(),
         vk::BufferCreateInfo {
-            size: std::mem::size_of_val(&vertices) as u64,
             usage: vk::BufferUsageFlags::VERTEX_BUFFER,
             ..Default::default()
         },
@@ -117,6 +147,7 @@ fn main() -> Result<()> {
     .unwrap();
 
     let mut delta = Instant::now();
+    let start_time = Instant::now();
 
     event_loop.run(|event, target| match event {
         Event::WindowEvent {
@@ -136,6 +167,34 @@ fn main() -> Result<()> {
 
                 // println!("fps {}", 1.0 / delta.elapsed().as_secs_f64());
                 delta = Instant::now();
+
+                let t = start_time.elapsed().as_secs_f32() / 4.0;
+
+                let cam_transform = Transform::from_xyz(t.sin() * 10.0, 1.0, t.cos() * 10.0)
+                    .looking_at(Vec3::ZERO, -Vec3::Y);
+
+                let view = Mat4::look_to_rh(
+                    cam_transform.translation,
+                    cam_transform.forward(),
+                    cam_transform.up(),
+                );
+
+                let window_size = window.inner_size();
+                let proj = Mat4::perspective_rh_gl(
+                    (90.0_f32).to_radians(),
+                    window_size.width as f32 / window_size.height as f32,
+                    0.1,
+                    100.0,
+                );
+
+                let pos = cam_transform.translation;
+
+                let data = [CameraUniform {
+                    proj: (proj * view).to_cols_array_2d(),
+                    pos: [pos.x, pos.y, pos.z, 1.0],
+                }];
+
+                camera_unifrom_buffer.write(&data);
 
                 unsafe {
                     graphics::draw(
@@ -191,4 +250,50 @@ fn main() -> Result<()> {
     })?;
 
     Ok(())
+}
+
+pub fn read_teapod_file() -> Vec<Vertex> {
+    let mut vertecies = vec![];
+    let mut faces = vec![];
+
+    for line in include_str!("./assets/cube.obj")
+        .lines()
+        .filter(|line| line.starts_with("v ") || line.starts_with("f "))
+    {
+        match &line[..2] {
+            "v " => {
+                let pos: [f32; 3] = line[2..]
+                    .split_whitespace()
+                    .filter_map(|v| v.parse::<f32>().ok())
+                    .collect::<Vec<f32>>()
+                    .try_into()
+                    .unwrap();
+
+                vertecies.push(Vertex {
+                    pos: [pos[0], pos[1], pos[2], 1.0],
+                })
+            }
+            "f " => {
+                let indexes: [usize; 3] = line[2..]
+                    .split_whitespace()
+                    .map(|v| v.split("/").next().unwrap())
+                    .filter_map(|v| v.parse::<usize>().ok())
+                    .map(|v| v - 1)
+                    .collect::<Vec<usize>>()
+                    .try_into()
+                    .unwrap();
+
+                faces.push(vertecies[indexes[0]]);
+                faces.push(vertecies[indexes[1]]);
+                faces.push(vertecies[indexes[2]]);
+
+                // faces.push(vertecies[indexes[0]]);
+                // faces.push(vertecies[indexes[2]]);
+                // faces.push(vertecies[indexes[3]]);
+            }
+            _ => {}
+        }
+    }
+
+    faces
 }

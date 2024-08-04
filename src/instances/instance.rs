@@ -1,4 +1,4 @@
-use std::{ffi::c_char, sync::Arc};
+use std::{ffi::{c_char, CStr}, sync::Arc};
 
 use anyhow::Result;
 use ash::vk;
@@ -23,7 +23,9 @@ impl Instance {
         let entry = ash::Entry::load()?;
 
         //  TODO: find an engine name
-        let application = vk::ApplicationInfo::default();
+        let application = vk::ApplicationInfo::default()
+            .api_version(vk::API_VERSION_1_0)
+            .application_name(CStr::from_bytes_with_nul_unchecked(b"my app\n"));
 
         let create_info = vk::InstanceCreateInfo::default()
             .flags(vk::InstanceCreateFlags::ENUMERATE_PORTABILITY_KHR)

@@ -11,13 +11,8 @@ pub struct RenderPass {
 }
 
 impl RenderPass {
-
-
     // just a temporary way of creating a renderpass where everything is hardcoded
-    pub fn new_deafult(
-        device: Arc<Device>,
-        format: vk::Format,
-    ) -> Result<Arc<Self>> {
+    pub fn new_deafult(device: Arc<Device>, format: vk::Format) -> Result<Arc<Self>> {
         let renderpass_attachments = [
             vk::AttachmentDescription {
                 format,
@@ -84,10 +79,8 @@ impl RenderPass {
     }
 }
 
-
 impl Drop for RenderPass {
     fn drop(&mut self) {
         unsafe { self.device.as_raw().destroy_render_pass(self.intern, None) };
     }
 }
-

@@ -31,7 +31,7 @@ pub enum VertexInputBinding {
 #[derive(Clone, Copy, Debug)]
 #[allow(unused)]
 pub enum ViewportMode {
-    // viewpoer is relative to the window size 
+    // viewpoer is relative to the window size
     // 1.0 would fill the whole wndow
     // order : posx, posy, scalex, scaley
     Relative(f32, f32, f32, f32),

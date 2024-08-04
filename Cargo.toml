@@ -8,8 +8,8 @@ anyhow = "1.0.86"
 ash = { version = "0.38.0" }
 bytemuck = "1.16.1"
 glam = "0.28.0"
-raw-window-handle = "0.6.2"
 shaderc = "0.8.3"
+raw-window-handle = "0.6.2"
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 raw-window-metal = "0.4.0"
@@ -19,7 +19,14 @@ raw-window-metal = "0.4.0"
 winit = "0.29.0"
 
 
+
 [[example]]
 name = "triangle"
 path = "examples/triangle.rs"
+doc-scrape-examples = true
+
+
+[[example]]
+name = "teapod"
+path = "examples/teapod.rs"
 doc-scrape-examples = true
