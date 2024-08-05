@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ash::vk;
-use descriptors::{DescriptorPool, DescriptorSet, WriteDescriptorSet};
+use descriptors::{BindingDescriptor, DescriptorPool, DescriptorSet, WriteDescriptorSet};
 use graphics::PipelineGraphics;
 use std::{sync::Arc, time::Instant};
 
@@ -60,25 +60,19 @@ fn main() -> Result<()> {
     )
     .unwrap();
 
-    let sizes = [vk::DescriptorPoolSize {
-        ty: vk::DescriptorType::STORAGE_BUFFER,
-        descriptor_count: 1,
-    }];
-
-    let descriptor_pool = DescriptorPool::new(device.clone(), &sizes, 1)?;
-
     let buffer_info = [instance_buffer.desc()];
 
-    let writes = [WriteDescriptorSet {
-        buffer_info: Some(&buffer_info),
-        image_info: None,
-        descriptor_count: 1,
-        descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-        dst_binding: 0,
-        dst_set: 0,
+    let set_layout = [BindingDescriptor {
+        ty: descriptors::DescriptorType::UniformBuffer,
+        count: 1,
+        binding: 0,
+        shader_stage: vk::ShaderStageFlags::VERTEX,
     }];
 
-    let model_matrix = DescriptorSet::new(descriptor_pool.clone(), &writes)?;
+    let writes = [WriteDescriptorSet::Buffers(0, instance_buffer.clone())];
+
+    let model_matrix = DescriptorSet::new(descriptor_pool.clone(), &set_layout)?;
+    model_matrix.write(&writes);
 
     let pipeline = PipelineGraphics::test(
         device.clone(),

@@ -1,90 +1,82 @@
+use crate::instances::Device;
 use anyhow::Result;
-use ash::vk::{self, ShaderStageFlags};
+use ash::vk;
 use std::sync::Arc;
 
-use super::{DescriptorPool, WriteDescriptorSet};
+use super::WriteDescriptorSet;
 
 pub struct DescriptorSet {
-    intern: Vec<vk::DescriptorSet>,
-    layout: Vec<vk::DescriptorSetLayout>,
-    pool: Arc<DescriptorPool>,
+    intern: vk::DescriptorSet,
+    layout: vk::DescriptorSetLayout,
+    pool: Arc<super::DescriptorPool>,
 }
 
 impl DescriptorSet {
-    pub fn new(
-        pool: Arc<DescriptorPool>,
-        writes: &[super::WriteDescriptorSet],
-    ) -> Result<Arc<Self>> {
-        let device_raw = pool.device.as_raw();
+    pub fn new(device: Arc<Device>, bindings: &[super::BindingDescriptor]) -> Result<Arc<Self>> {
+        let pool = super::DescriptorPool::new(device, bindings, 1)?;
+        Self::from_pool(pool)
+    }
 
-        let desc_layout_bindings: Vec<_> = writes
-            .iter()
-            .map(|desc| vk::DescriptorSetLayoutBinding {
-                binding: desc.dst_binding,
-                descriptor_type: desc.descriptor_type,
-                descriptor_count: desc.descriptor_count,
-                stage_flags: ShaderStageFlags::ALL,
-                ..Default::default()
-            })
-            .collect();
+    pub fn from_pool(pool: Arc<super::DescriptorPool>) -> Result<Arc<Self>> {
+        let desc_layout_bindings: Vec<vk::DescriptorSetLayoutBinding> =
+            pool.bindings.iter().map(Into::into).collect();
 
         let descriptor_info =
             vk::DescriptorSetLayoutCreateInfo::default().bindings(&desc_layout_bindings);
 
-        let desc_set_layouts =
-            [unsafe { device_raw.create_descriptor_set_layout(&descriptor_info, None) }?];
+        let desc_set_layout = unsafe {
+            pool.device
+                .as_raw()
+                .create_descriptor_set_layout(&descriptor_info, None)
+        }?;
 
+        let layouts = [desc_set_layout];
         let desc_alloc_info = vk::DescriptorSetAllocateInfo::default()
             .descriptor_pool(pool.intern)
-            .set_layouts(&desc_set_layouts);
+            .set_layouts(&layouts);
 
-        let descriptor_sets = unsafe { device_raw.allocate_descriptor_sets(&desc_alloc_info) }?;
+        let descriptor_set = unsafe {
+            pool.device
+                .as_raw()
+                .allocate_descriptor_sets(&desc_alloc_info)
+        }?[0];
 
-        let writes: Vec<_> = writes
+        Ok(Self {
+            intern: descriptor_set,
+            layout: desc_set_layout,
+            pool,
+        }
+        .into())
+    }
+
+    pub fn write(&self, writes: &[super::WriteDescriptorSet]) {
+        let buffer_infos: Vec<Option<Vec<_>>> = writes
             .iter()
-            .map(|write| {
-                let mut vkwrite = vk::WriteDescriptorSet::default()
-                    .dst_binding(write.dst_binding)
-                    .descriptor_count(write.descriptor_count)
-                    .descriptor_type(write.descriptor_type)
-                    .dst_set(descriptor_sets[write.dst_set as usize]);
-
-                if let Some(info) = write.image_info {
-                    vkwrite = vkwrite.image_info(info);
-                } else if let Some(info) = write.buffer_info {
-                    vkwrite = vkwrite.buffer_info(info);
-                }
-
-                vkwrite
+            .map(|v| match v {
+                WriteDescriptorSet::Buffers(_, buffers) => Some(
+                    buffers
+                        .iter()
+                        .map(|b| vk::DescriptorBufferInfo {
+                            offset: b.offset(),
+                            range: b.size(),
+                            buffer: b.buffer_raw(),
+                        })
+                        .collect(),
+                ),
+                _ => None,
             })
             .collect();
 
-        unsafe { device_raw.update_descriptor_sets(&writes, &[]) };
-
-        Ok(Arc::new(Self {
-            intern: descriptor_sets,
-            layout: desc_set_layouts.into(),
-            pool,
-        }))
-    }
-
-    pub fn update(&self, writes: &[WriteDescriptorSet]) {
-        let writes: Vec<_> = writes
-            .iter()
-            .map(|write| {
-                let mut vkwrite = vk::WriteDescriptorSet::default()
-                    .dst_binding(write.dst_binding)
-                    .descriptor_count(write.descriptor_count)
-                    .descriptor_type(write.descriptor_type)
-                    .dst_set(self.intern[write.dst_set as usize]);
-
-                if let Some(info) = write.image_info {
-                    vkwrite = vkwrite.image_info(info);
-                } else if let Some(info) = write.buffer_info {
-                    vkwrite = vkwrite.buffer_info(info);
-                }
-
-                vkwrite
+        let write_descriptors: Vec<_> = writes
+            .into_iter()
+            .enumerate()
+            .map(|(i, desc)| match desc {
+                WriteDescriptorSet::Buffers(binding, buffers) => vk::WriteDescriptorSet::default()
+                    .descriptor_type(self.pool.bindings[*binding as usize].ty.into())
+                    .descriptor_count(buffer_infos.len() as u32)
+                    .dst_set(self.intern)
+                    .dst_binding(*binding)
+                    .buffer_info(&buffer_infos[i].as_ref().unwrap()),
             })
             .collect();
 
@@ -92,14 +84,15 @@ impl DescriptorSet {
             self.pool
                 .device
                 .as_raw()
-                .update_descriptor_sets(&writes, &[])
+                .update_descriptor_sets(&write_descriptors, &[])
         };
     }
 
-    pub fn layout(&self) -> Vec<vk::DescriptorSetLayout> {
-        self.layout.clone()
+    pub fn layout(&self) -> vk::DescriptorSetLayout {
+        self.layout
     }
-    pub fn as_raw(&self) -> Vec<vk::DescriptorSet> {
-        self.intern.clone()
+
+    pub fn as_raw(&self) -> vk::DescriptorSet {
+        self.intern
     }
 }

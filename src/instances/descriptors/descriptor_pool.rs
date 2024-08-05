@@ -1,39 +1,42 @@
+use anyhow::Result;
 use std::sync::Arc;
 
+use super::BindingDescriptor;
 use crate::instances::Device;
-use anyhow::Result;
 use ash::vk;
 
 pub struct DescriptorPool {
     pub(super) intern: vk::DescriptorPool,
     pub(super) device: Arc<Device>,
+    pub(super) bindings: Arc<[BindingDescriptor]>,
 }
 
 impl DescriptorPool {
     pub fn new(
         device: Arc<Device>,
-        sizes: &[vk::DescriptorPoolSize],
+        bindings: &[BindingDescriptor],
         max_sets: u32,
     ) -> Result<Arc<Self>> {
+        let sizes: Vec<_> = bindings
+            .iter()
+            .map(|b| {
+                vk::DescriptorPoolSize::default()
+                    .descriptor_count(b.count)
+                    .ty(b.ty.into())
+            })
+            .collect();
+
         let create_info = vk::DescriptorPoolCreateInfo::default()
-            .pool_sizes(sizes)
-            .max_sets(max_sets);
+            .max_sets(max_sets)
+            .pool_sizes(&sizes);
 
         let pool = unsafe { device.as_raw().create_descriptor_pool(&create_info, None) }?;
 
-        Ok(Arc::new(Self {
+        Ok(Self {
             intern: pool,
+            bindings: bindings.into(),
             device,
-        }))
-    }
-}
-
-impl Drop for DescriptorPool {
-    fn drop(&mut self) {
-        unsafe {
-            self.device
-                .as_raw()
-                .destroy_descriptor_pool(self.intern, None)
-        };
+        }
+        .into())
     }
 }

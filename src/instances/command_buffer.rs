@@ -122,7 +122,7 @@ impl CommandBuffer {
                 pipeline.bind_point(),
                 pipeline.layout(),
                 first_set,
-                &set.as_raw(),
+                &[set.as_raw()],
                 offsets,
             )
         };

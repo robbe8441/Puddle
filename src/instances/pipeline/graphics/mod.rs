@@ -61,7 +61,7 @@ impl PipelineGraphics {
             },
         ];
 
-        let descriptor_layouts = descriptors.layout();
+        let descriptor_layouts = [descriptors.layout()];
         let layout_create_info =
             vk::PipelineLayoutCreateInfo::default().set_layouts(&descriptor_layouts);
 

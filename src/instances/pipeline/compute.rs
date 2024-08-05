@@ -26,7 +26,7 @@ impl PipelineCompute {
             .stage(shader.kind().into())
             .name(unsafe { CStr::from_bytes_with_nul_unchecked(entry.as_bytes()) });
 
-        let descriptor_layouts = descriptors.layout();
+        let descriptor_layouts = [descriptors.layout()];
         let layout_create_info =
             vk::PipelineLayoutCreateInfo::default().set_layouts(&descriptor_layouts);
 

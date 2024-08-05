@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ash::vk;
-use descriptors::{DescriptorPool, DescriptorSet, WriteDescriptorSet};
+use descriptors::{BindingDescriptor, DescriptorPool, DescriptorSet, WriteDescriptorSet};
 use glam::{Mat4, Quat, Vec3};
 use std::{sync::Arc, time::Instant};
 use vk_render::instances::graphics::PipelineGraphics;
@@ -51,7 +51,7 @@ fn main() -> Result<()> {
     let instance_buffer: Arc<Subbuffer<[[f32; 4]; 4]>> = Subbuffer::from_data(
         device.clone(),
         vk::BufferCreateInfo {
-            usage: vk::BufferUsageFlags::STORAGE_BUFFER,
+            usage: vk::BufferUsageFlags::UNIFORM_BUFFER,
             ..Default::default()
         },
         vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
@@ -64,7 +64,7 @@ fn main() -> Result<()> {
     let camera_unifrom_buffer: Arc<Subbuffer<CameraUniform>> = Subbuffer::from_data(
         device.clone(),
         vk::BufferCreateInfo {
-            usage: vk::BufferUsageFlags::STORAGE_BUFFER,
+            usage: vk::BufferUsageFlags::UNIFORM_BUFFER,
             ..Default::default()
         },
         vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
@@ -72,47 +72,37 @@ fn main() -> Result<()> {
     )
     .unwrap();
 
-    let sizes = [
-        vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::STORAGE_BUFFER,
-            descriptor_count: 1,
-        },
-        vk::DescriptorPoolSize {
-            ty: vk::DescriptorType::STORAGE_BUFFER,
-            descriptor_count: 1,
-        },
-    ];
-
-    let descriptor_pool = DescriptorPool::new(device.clone(), &sizes, 1)?;
-
     let buffer_info = [instance_buffer.desc()];
     let camera_buffer_info = [camera_unifrom_buffer.desc()];
 
-    let writes = [
-        WriteDescriptorSet {
-            buffer_info: Some(&buffer_info),
-            image_info: None,
-            descriptor_count: 1,
-            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-            dst_binding: 0,
-            dst_set: 0,
+    let descriptor_bindings = [
+        BindingDescriptor {
+            ty: descriptors::DescriptorType::UniformBuffer,
+            binding: 0,
+            count: 1,
+            shader_stage: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
         },
-        WriteDescriptorSet {
-            buffer_info: Some(&camera_buffer_info),
-            image_info: None,
-            descriptor_count: 1,
-            descriptor_type: vk::DescriptorType::STORAGE_BUFFER,
-            dst_binding: 1,
-            dst_set: 0,
-        },
+        BindingDescriptor {
+            ty: descriptors::DescriptorType::UniformBuffer,
+            binding: 1,
+            count: 1,
+            shader_stage: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+        }
     ];
 
-    let model_matrix = DescriptorSet::new(descriptor_pool.clone(), &writes)?;
+    let descriptor_sets = DescriptorSet::new(device.clone(), &descriptor_bindings)?;
+
+    let writes = [
+        WriteDescriptorSet::Buffers(0, vec![instance_buffer.clone()]),
+        WriteDescriptorSet::Buffers(1, vec![camera_unifrom_buffer.clone()]),
+    ];
+
+    descriptor_sets.write(&writes);
 
     let pipeline = PipelineGraphics::test(
         device.clone(),
         swapchain.format().format,
-        model_matrix.clone(),
+        descriptor_sets.clone(),
     );
 
     let mut framebuffers: Vec<Arc<Framebuffer>> = swapchain
@@ -163,7 +153,7 @@ fn main() -> Result<()> {
 
                 command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
-                command_buffer.bind_descriptor_set(model_matrix.clone(), 0, pipeline.clone(), &[0]);
+                command_buffer.bind_descriptor_set(descriptor_sets.clone(), 0, pipeline.clone(), &[0]);
 
                 // println!("fps {}", 1.0 / delta.elapsed().as_secs_f64());
                 delta = Instant::now();
@@ -194,7 +184,7 @@ fn main() -> Result<()> {
                     pos: [pos.x, pos.y, pos.z, 1.0],
                 }];
 
-                camera_unifrom_buffer.write(&data);
+                camera_unifrom_buffer.write(&data).unwrap();
 
                 unsafe {
                     graphics::draw(

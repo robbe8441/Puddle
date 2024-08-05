@@ -56,7 +56,7 @@ void main() {
     vec3 ray_dir = normalize(pos_out.xyz - cam_pos_model);
 
     for (int i = 0; i < 400; i++) {
-        vec3 pos = pos_out.xyz + ray_dir * (i / 50.0);
+        vec3 pos = pos_out.xyz + ray_dir * (i / 100.0);
         float box = sdBoxFrame(pos, vec3(1.0), 0.05);
         float sphere = sdPyramid(pos + vec3(0.0, 0.5, 0.0), 1.0);
 
