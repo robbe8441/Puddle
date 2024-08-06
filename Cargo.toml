@@ -17,6 +17,7 @@ raw-window-metal = "0.4.0"
 
 [dev-dependencies]
 winit = "0.29.0"
+image = "0.25.2"
 
 
 
@@ -29,4 +30,10 @@ doc-scrape-examples = true
 [[example]]
 name = "teapod"
 path = "examples/teapod.rs"
+doc-scrape-examples = true
+
+
+[[example]]
+name = "image"
+path = "examples/image.rs"
 doc-scrape-examples = true

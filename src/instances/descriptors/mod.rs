@@ -60,5 +60,5 @@ impl<'a> Into<vk::DescriptorSetLayoutBinding<'a>> for &BindingDescriptor {
 
 pub enum WriteDescriptorSet {
     Buffers(u32, Vec<Arc<dyn BufferAllocation>>),
-    // Image(u32),
+    ImageViews(u32, Vec<vk::ImageView>),
 }

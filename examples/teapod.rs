@@ -1,7 +1,7 @@
 use anyhow::Result;
 use ash::vk;
-use descriptors::{BindingDescriptor, DescriptorPool, DescriptorSet, WriteDescriptorSet};
-use glam::{Mat4, Quat, Vec3};
+use descriptors::{BindingDescriptor, DescriptorSet, WriteDescriptorSet};
+use glam::{Mat4, Vec3};
 use std::{sync::Arc, time::Instant};
 use vk_render::instances::graphics::PipelineGraphics;
 use vk_render::types::Transform;
@@ -16,11 +16,9 @@ use winit::{
 #[repr(C)]
 #[derive(Clone, Copy, Debug, Default)]
 struct CameraUniform {
-    proj: [[f32;4];4],
+    proj: [[f32; 4]; 4],
     pos: [f32; 4],
 }
-
-
 
 fn main() -> Result<()> {
     let event_loop = EventLoop::new()?;
@@ -40,13 +38,19 @@ fn main() -> Result<()> {
 
     let command_pool = CommandPool::new(device.clone(), queue.family_index())?;
 
-    let instances = [
-        Transform::from_xyz(0.0, 0.0, 0.0)
-            // .looking_at(Vec3::ONE.normalize(), Vec3::Y)
-            .with_scale(Vec3::splat(2.0))
-            .compute_matrix()
-            .to_cols_array_2d(),
-    ];
+    let instances = [Transform::from_xyz(0.0, 0.0, 0.0)
+        .looking_at(Vec3::ONE.normalize(), Vec3::Y)
+        .with_scale(Vec3::splat(2.0))];
+
+    let model_matricies: Vec<_> = instances
+        .iter()
+        .map(|m| m.compute_matrix().to_cols_array_2d())
+        .collect();
+
+    let model_matricies_inverted: Vec<_> = instances
+        .iter()
+        .map(|m| m.compute_matrix().inverse().to_cols_array_2d())
+        .collect();
 
     let instance_buffer: Arc<Subbuffer<[[f32; 4]; 4]>> = Subbuffer::from_data(
         device.clone(),
@@ -55,7 +59,18 @@ fn main() -> Result<()> {
             ..Default::default()
         },
         vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
-        &instances,
+        &model_matricies,
+    )
+    .unwrap();
+
+    let inverted_instance_buffer: Arc<Subbuffer<[[f32; 4]; 4]>> = Subbuffer::from_data(
+        device.clone(),
+        vk::BufferCreateInfo {
+            usage: vk::BufferUsageFlags::UNIFORM_BUFFER,
+            ..Default::default()
+        },
+        vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        &model_matricies_inverted,
     )
     .unwrap();
 
@@ -80,21 +95,28 @@ fn main() -> Result<()> {
             ty: descriptors::DescriptorType::UniformBuffer,
             binding: 0,
             count: 1,
-            shader_stage: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
+            shader_stage: vk::ShaderStageFlags::VERTEX,
         },
         BindingDescriptor {
             ty: descriptors::DescriptorType::UniformBuffer,
             binding: 1,
             count: 1,
+            shader_stage: vk::ShaderStageFlags::FRAGMENT,
+        },
+        BindingDescriptor {
+            ty: descriptors::DescriptorType::UniformBuffer,
+            binding: 2,
+            count: 1,
             shader_stage: vk::ShaderStageFlags::VERTEX | vk::ShaderStageFlags::FRAGMENT,
-        }
+        },
     ];
 
     let descriptor_sets = DescriptorSet::new(device.clone(), &descriptor_bindings)?;
 
     let writes = [
         WriteDescriptorSet::Buffers(0, vec![instance_buffer.clone()]),
-        WriteDescriptorSet::Buffers(1, vec![camera_unifrom_buffer.clone()]),
+        WriteDescriptorSet::Buffers(1, vec![inverted_instance_buffer.clone()]),
+        WriteDescriptorSet::Buffers(2, vec![camera_unifrom_buffer.clone()]),
     ];
 
     descriptor_sets.write(&writes);
@@ -153,7 +175,12 @@ fn main() -> Result<()> {
 
                 command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 
-                command_buffer.bind_descriptor_set(descriptor_sets.clone(), 0, pipeline.clone(), &[0]);
+                command_buffer.bind_descriptor_set(
+                    descriptor_sets.clone(),
+                    0,
+                    pipeline.clone(),
+                    &[0],
+                );
 
                 // println!("fps {}", 1.0 / delta.elapsed().as_secs_f64());
                 delta = Instant::now();
@@ -246,7 +273,7 @@ pub fn read_teapod_file() -> Vec<Vertex> {
     let mut vertecies = vec![];
     let mut faces = vec![];
 
-    for line in include_str!("./assets/cube.obj")
+    for line in include_str!("./assets/teapot.obj")
         .lines()
         .filter(|line| line.starts_with("v ") || line.starts_with("f "))
     {

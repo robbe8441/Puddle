@@ -1,3 +1,5 @@
+mod view;
+
 use super::buffer::DeviceMemory;
 use anyhow::Result;
 use std::sync::Arc;
@@ -12,7 +14,7 @@ pub struct Image {
 }
 
 impl Image {
-    pub fn new(device: Arc<super::Device>, create_info: vk::ImageCreateInfo) -> Result<Arc<Self>> {
+    pub fn new(device: Arc<super::Device>, create_info: &vk::ImageCreateInfo) -> Result<Arc<Self>> {
         let device_raw = device.as_raw();
 
         let image = unsafe { device_raw.create_image(&create_info, None) }?;

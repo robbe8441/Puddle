@@ -1,4 +1,4 @@
-use std::sync::Arc;
+use std::{ffi::{CStr, CString}, sync::Arc};
 
 use crate::instances::Device;
 use anyhow::{Context, Result};
@@ -7,7 +7,7 @@ use ash::vk;
 pub struct ShaderModule {
     intern: vk::ShaderModule,
     kind: ShaderKind,
-    entry: &'static str,
+    entry: CString,
     device: Arc<Device>,
 }
 
@@ -53,6 +53,8 @@ impl ShaderModule {
 
         let module = unsafe { device.as_raw().create_shader_module(&create_info, None) }?;
 
+        let entry = CString::new(entry)?;
+
         Ok(Arc::new(Self {
             intern: module,
             kind: shader_kind,
@@ -64,11 +66,18 @@ impl ShaderModule {
     pub fn as_raw(&self) -> vk::ShaderModule {
         self.intern.clone()
     }
-    pub fn entry(&self) -> &str {
-        self.entry
-    }
+
     pub fn kind(&self) -> ShaderKind {
         self.kind
+    }
+
+    pub fn shader_stage_info(&self) -> vk::PipelineShaderStageCreateInfo {
+        vk::PipelineShaderStageCreateInfo {
+            stage: self.kind.into(),
+            module: self.intern,
+            p_name: self.entry.as_ptr(),
+            ..Default::default()
+        }
     }
 }
 

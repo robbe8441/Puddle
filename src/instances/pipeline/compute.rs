@@ -18,13 +18,7 @@ impl PipelineCompute {
     ) -> Result<Arc<Self>> {
         let device_raw = device.as_raw();
 
-        let mut entry = shader.entry().to_string();
-        entry.push_str("\0");
-
-        let shader_stage = vk::PipelineShaderStageCreateInfo::default()
-            .module(shader.as_raw())
-            .stage(shader.kind().into())
-            .name(unsafe { CStr::from_bytes_with_nul_unchecked(entry.as_bytes()) });
+        let shader_stage = shader.shader_stage_info();
 
         let descriptor_layouts = [descriptors.layout()];
         let layout_create_info =

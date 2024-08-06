@@ -6,7 +6,7 @@ use graphics::PipelineGraphics;
 use std::{sync::Arc, time::Instant};
 
 use vk_render::{
-    instances::*,
+    instances::{ShaderModule, *},
     types::{Transform, Vertex},
 };
 use winit::{
@@ -56,6 +56,21 @@ fn main() -> Result<()> {
         .compute_matrix()
         .to_cols_array_2d()];
 
+    let instances_inverted = [Transform::from_xyz(0.0, 0.0, 0.0)
+        .compute_matrix()
+        .inverse()
+        .to_cols_array_2d()];
+
+    let inverted_instance_buffer: Arc<Subbuffer<[[f32; 4]; 4]>> = Subbuffer::from_data(
+        device.clone(),
+        vk::BufferCreateInfo {
+            usage: vk::BufferUsageFlags::STORAGE_BUFFER,
+            ..Default::default()
+        },
+        vk::MemoryPropertyFlags::HOST_VISIBLE | vk::MemoryPropertyFlags::HOST_COHERENT,
+        &instances_inverted,
+    )
+    .unwrap();
     let instance_buffer: Arc<Subbuffer<[[f32; 4]; 4]>> = Subbuffer::from_data(
         device.clone(),
         vk::BufferCreateInfo {
@@ -83,6 +98,53 @@ fn main() -> Result<()> {
     )
     .unwrap();
 
+    let image_create_info = vk::ImageCreateInfo {
+        image_type: vk::ImageType::TYPE_3D,
+        format: vk::Format::R8_UINT,
+        extent: vk::Extent3D {
+            width: 32,
+            height: 32,
+            depth: 32,
+        },
+        mip_levels: 1,
+        array_layers: 1,
+        samples: vk::SampleCountFlags::TYPE_1,
+        tiling: vk::ImageTiling::OPTIMAL,
+        usage: vk::ImageUsageFlags::STORAGE,
+        sharing_mode: vk::SharingMode::EXCLUSIVE,
+        ..Default::default()
+    };
+
+    let image = Image::new(device.clone(), &image_create_info)?;
+
+    let image_view_info = vk::ImageViewCreateInfo {
+        view_type: vk::ImageViewType::TYPE_3D,
+        format: image_create_info.format,
+        components: vk::ComponentMapping {
+            r: vk::ComponentSwizzle::R,
+            g: vk::ComponentSwizzle::G,
+            b: vk::ComponentSwizzle::B,
+            a: vk::ComponentSwizzle::A,
+        },
+        subresource_range: vk::ImageSubresourceRange {
+            aspect_mask: vk::ImageAspectFlags::COLOR,
+            level_count: 1,
+            layer_count: 1,
+            ..Default::default()
+        },
+        image: image.as_raw(),
+        ..Default::default()
+    };
+
+    let compute_shader = ShaderModule::from_source(
+        device.clone(),
+        include_str!("./shaders/generate_sphere.glsl"),
+        ShaderKind::Compute,
+        "main",
+    )?;
+
+    let image_view = unsafe { device.as_raw().create_image_view(&image_view_info, None) }?;
+
     let set_layout = [
         BindingDescriptor {
             ty: descriptors::DescriptorType::StorageBuffer,
@@ -91,20 +153,55 @@ fn main() -> Result<()> {
             shader_stage: vk::ShaderStageFlags::ALL,
         },
         BindingDescriptor {
-            ty: descriptors::DescriptorType::UniformBuffer,
+            ty: descriptors::DescriptorType::StorageBuffer,
             count: 1,
             binding: 1,
             shader_stage: vk::ShaderStageFlags::ALL,
+        },
+        BindingDescriptor {
+            ty: descriptors::DescriptorType::UniformBuffer,
+            count: 1,
+            binding: 2,
+            shader_stage: vk::ShaderStageFlags::ALL,
+        },
+        BindingDescriptor {
+            ty: descriptors::DescriptorType::StorageImage,
+            count: 1,
+            binding: 3,
+            shader_stage: vk::ShaderStageFlags::COMPUTE | vk::ShaderStageFlags::FRAGMENT,
         },
     ];
 
     let writes = [
         WriteDescriptorSet::Buffers(0, vec![instance_buffer.clone()]),
-        WriteDescriptorSet::Buffers(1, vec![camera_unifrom_buffer.clone()]),
+        WriteDescriptorSet::Buffers(1, vec![inverted_instance_buffer.clone()]),
+        WriteDescriptorSet::Buffers(2, vec![camera_unifrom_buffer.clone()]),
+        WriteDescriptorSet::ImageViews(3, vec![image_view.clone()]),
     ];
 
     let model_matrix = DescriptorSet::new(device.clone(), &set_layout)?;
     model_matrix.write(&writes);
+
+    let compute_pipeline = vk_render::instances::compute::PipelineCompute::new(
+        device.clone(),
+        compute_shader,
+        model_matrix.clone(),
+    )?;
+
+    let recording_buffer = CommandBuffer::new(command_pool.clone())?;
+    recording_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
+
+    recording_buffer.bind_pipeline(compute_pipeline.clone());
+
+    recording_buffer.bind_descriptor_set(model_matrix.clone(), 0, compute_pipeline.clone(), &[0]);
+
+    recording_buffer.dispatch(1, 1, 32);
+
+    recording_buffer.end();
+
+    let fence = Fence::new(device.clone())?;
+
+    fence.submit_buffers(&[recording_buffer], queue.clone());
 
     let pipeline = PipelineGraphics::test(
         device.clone(),
@@ -159,8 +256,8 @@ fn main() -> Result<()> {
 
                 let t = start_time.elapsed().as_secs_f32();
 
-                let cam_transform =
-                    Transform::from_xyz(t.cos() * 2.0, 1.0, t.sin() * 2.0).looking_at(Vec3::ZERO, -Vec3::Y);
+                let cam_transform = Transform::from_xyz(t.cos() * 2.0, 1.0, t.sin() * 2.0)
+                    .looking_at(Vec3::ZERO, -Vec3::Y);
 
                 let view = Mat4::look_to_rh(
                     cam_transform.translation,
@@ -183,7 +280,7 @@ fn main() -> Result<()> {
                     pos: [pos.x, pos.y, pos.z, 1.0],
                 }];
 
-                camera_unifrom_buffer.write(&data);
+                camera_unifrom_buffer.write(&data).unwrap();
 
                 command_buffer.begin(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT);
 

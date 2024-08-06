@@ -10,6 +10,32 @@ pub struct RenderPass {
     device: Arc<Device>,
 }
 
+pub struct AttachmentDescription {
+    format: vk::Format,
+    samples: u32,
+    store_op: vk::AttachmentStoreOp,
+    load_op: vk::AttachmentLoadOp,
+    layout: vk::ImageLayout,
+}
+
+impl Into<vk::AttachmentDescription> for AttachmentDescription {
+    fn into(self) -> vk::AttachmentDescription {
+        vk::AttachmentDescription {
+            format: self.format,
+            samples: vk::SampleCountFlags::TYPE_1,
+            load_op: self.load_op,
+            store_op: self.store_op,
+            initial_layout: self.layout,
+            final_layout: self.layout,
+            ..Default::default()
+        }
+    }
+}
+
+
+
+
+
 impl RenderPass {
     // just a temporary way of creating a renderpass where everything is hardcoded
     pub fn new_deafult(device: Arc<Device>, format: vk::Format) -> Result<Arc<Self>> {
@@ -20,6 +46,7 @@ impl RenderPass {
                 load_op: vk::AttachmentLoadOp::CLEAR,
                 store_op: vk::AttachmentStoreOp::STORE,
                 final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+                initial_layout: vk::ImageLayout::PRESENT_SRC_KHR,
                 ..Default::default()
             },
             vk::AttachmentDescription {

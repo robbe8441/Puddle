@@ -67,6 +67,23 @@ impl DescriptorSet {
             })
             .collect();
 
+        let image_infos: Vec<Option<Vec<_>>> = writes
+            .iter()
+            .map(|v| match v {
+                WriteDescriptorSet::ImageViews(_, views) => Some(
+                    views
+                        .iter()
+                        .map(|b| vk::DescriptorImageInfo {
+                            sampler: vk::Sampler::null(),
+                            image_view: *b,
+                            image_layout: vk::ImageLayout::GENERAL,
+                        })
+                        .collect(),
+                ),
+                _ => None,
+            })
+            .collect();
+
         let write_descriptors: Vec<_> = writes
             .into_iter()
             .enumerate()
@@ -77,6 +94,12 @@ impl DescriptorSet {
                     .dst_set(self.intern)
                     .dst_binding(*binding)
                     .buffer_info(&buffer_infos[i].as_ref().unwrap()),
+                WriteDescriptorSet::ImageViews(binding, views) => vk::WriteDescriptorSet::default()
+                    .descriptor_type(self.pool.bindings[*binding as usize].ty.into())
+                    .descriptor_count(buffer_infos.len() as u32)
+                    .dst_set(self.intern)
+                    .dst_binding(*binding)
+                    .image_info(&image_infos[i].as_ref().unwrap()),
             })
             .collect();
 
