@@ -16,13 +16,13 @@ pub struct PipelineGraphics {
 }
 
 impl PipelineGraphics {
-
     pub fn test(
         device: Arc<Device>,
         format: vk::Format,
         descriptors: Arc<crate::instances::descriptors::DescriptorSet>,
     ) -> Arc<PipelineGraphics> {
         let render_pass = render_pass::RenderPass::new_deafult(device.clone(), format).unwrap();
+
 
         let vertex_shader = ShaderModule::from_source(
             device.clone(),
@@ -77,10 +77,10 @@ impl PipelineGraphics {
             .viewports(&[]);
 
         let rasterization_info = vk::PipelineRasterizationStateCreateInfo {
-            front_face: vk::FrontFace::COUNTER_CLOCKWISE,
+            front_face: vk::FrontFace::CLOCKWISE,
             line_width: 1.0,
             polygon_mode: vk::PolygonMode::FILL,
-            cull_mode: vk::CullModeFlags::NONE,
+            cull_mode: vk::CullModeFlags::BACK,
             ..Default::default()
         };
         let multisample_state_info = vk::PipelineMultisampleStateCreateInfo {
@@ -175,7 +175,7 @@ pub unsafe fn draw(
         },
     ];
 
-    let viewport = pipeline_create_info::ViewportMode::Relative(1.0, 1.0, 1.0, 1.0);
+    let viewport = pipeline_create_info::ViewportMode::Relative(0.25, 1.0, 1.0, 0.5);
 
     let scissors = [frame_buffer.size().into()];
     let viewports = [viewport.get_size(frame_buffer.size().into())];

@@ -124,7 +124,7 @@ impl Swapchain {
             .usage(vk::ImageUsageFlags::DEPTH_STENCIL_ATTACHMENT)
             .sharing_mode(vk::SharingMode::EXCLUSIVE);
 
-        let depth_image = super::Image::new(device.clone(), &depth_image_create_info).unwrap();
+        let depth_image = super::Image::new(device.clone(), depth_image_create_info).unwrap();
 
         let depth_image_view_info = vk::ImageViewCreateInfo::default()
             .subresource_range(

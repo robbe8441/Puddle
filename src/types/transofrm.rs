@@ -495,5 +495,4 @@ impl Transform {
     pub fn is_finite(&self) -> bool {
         self.translation.is_finite() && self.rotation.is_finite() && self.scale.is_finite()
     }
-
 }

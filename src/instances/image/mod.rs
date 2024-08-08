@@ -1,4 +1,8 @@
 mod view;
+mod sampler;
+pub use view::*;
+pub use sampler::*;
+
 
 use super::buffer::DeviceMemory;
 use anyhow::Result;
@@ -10,11 +14,11 @@ pub struct Image {
     intern: vk::Image,
     memory: Arc<DeviceMemory>,
     device: Arc<super::Device>,
-    layout: vk::ImageLayout,
+    create_info: vk::ImageCreateInfo<'static>,
 }
 
 impl Image {
-    pub fn new(device: Arc<super::Device>, create_info: &vk::ImageCreateInfo) -> Result<Arc<Self>> {
+    pub fn new(device: Arc<super::Device>, create_info: vk::ImageCreateInfo<'static>) -> Result<Arc<Self>> {
         let device_raw = device.as_raw();
 
         let image = unsafe { device_raw.create_image(&create_info, None) }?;
@@ -31,14 +35,23 @@ impl Image {
 
         Ok(Arc::new(Self {
             intern: image,
-            layout: create_info.initial_layout,
+            create_info,
             memory,
             device,
         }))
     }
 
+    pub fn layout(&self) -> vk::ImageLayout {
+        self.create_info.initial_layout
+    }
     pub fn as_raw(&self) -> vk::Image {
         self.intern
+    }
+    pub fn device(&self) -> Arc<super::Device> {
+        self.device.clone()
+    }
+    pub fn create_info(&self) -> vk::ImageCreateInfo {
+        self.create_info
     }
 }
 

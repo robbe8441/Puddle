@@ -26,6 +26,15 @@ impl<T> Subbuffer<T> {
             _marker: std::marker::PhantomData,
         }))
     }
+
+    pub fn empty(
+        device: Arc<Device>,
+        mut create_info: vk::BufferCreateInfo,
+        property_flags: vk::MemoryPropertyFlags,
+    ) -> Result<Arc<Subbuffer<T>>> {
+        let raw_buffer = RawBuffer::new(device, create_info, property_flags)?;
+        Ok(Subbuffer::from_raw(raw_buffer)?)
+    }
 }
 
 impl<T: Copy> Subbuffer<T> {

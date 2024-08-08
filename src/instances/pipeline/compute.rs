@@ -8,19 +8,19 @@ pub struct PipelineCompute {
     intern: vk::Pipeline,
     layout: vk::PipelineLayout,
     device: Arc<Device>,
+    descriptor_layouts: Arc<[vk::DescriptorSetLayout]>,
 }
 
 impl PipelineCompute {
     pub fn new(
         device: Arc<Device>,
         shader: Arc<ShaderModule>,
-        descriptors: Arc<crate::instances::descriptors::DescriptorSet>,
+        descriptor_layouts: Vec<vk::DescriptorSetLayout>,
     ) -> Result<Arc<Self>> {
         let device_raw = device.as_raw();
 
         let shader_stage = shader.shader_stage_info();
 
-        let descriptor_layouts = [descriptors.layout()];
         let layout_create_info =
             vk::PipelineLayoutCreateInfo::default().set_layouts(&descriptor_layouts);
 
@@ -39,6 +39,7 @@ impl PipelineCompute {
             intern: pipeline,
             layout,
             device,
+            descriptor_layouts: descriptor_layouts.into(),
         }))
     }
 }
@@ -53,6 +54,9 @@ impl super::Pipeline for PipelineCompute {
 
     fn as_raw(&self) -> vk::Pipeline {
         self.intern
+    }
+    fn set_layouts(&self) -> Arc<[vk::DescriptorSetLayout]> {
+        self.descriptor_layouts.clone()
     }
 }
 

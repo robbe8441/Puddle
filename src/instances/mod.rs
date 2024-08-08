@@ -24,3 +24,4 @@ pub use shader_module::*;
 pub use surface::Surface;
 pub use swapchain::Swapchain;
 pub use sync::*;
+pub use queue::*;

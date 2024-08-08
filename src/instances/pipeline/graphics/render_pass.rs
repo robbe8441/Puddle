@@ -32,10 +32,6 @@ impl Into<vk::AttachmentDescription> for AttachmentDescription {
     }
 }
 
-
-
-
-
 impl RenderPass {
     // just a temporary way of creating a renderpass where everything is hardcoded
     pub fn new_deafult(device: Arc<Device>, format: vk::Format) -> Result<Arc<Self>> {

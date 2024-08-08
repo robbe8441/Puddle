@@ -159,8 +159,8 @@ fn main() -> Result<()> {
 
                 let t = start_time.elapsed().as_secs_f32();
 
-                let cam_transform =
-                    Transform::from_xyz(t.cos() * 2.0, 1.0, t.sin() * 2.0).looking_at(Vec3::ZERO, -Vec3::Y);
+                let cam_transform = Transform::from_xyz(t.cos() * 2.0, 1.0, t.sin() * 2.0)
+                    .looking_at(Vec3::ZERO, -Vec3::Y);
 
                 let view = Mat4::look_to_rh(
                     cam_transform.translation,

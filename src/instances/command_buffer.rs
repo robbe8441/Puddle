@@ -1,9 +1,9 @@
-use super::pipeline::Pipeline;
+use super::{pipeline::Pipeline, Image};
 use crate::instances::BufferAllocation;
 use anyhow::{Context, Result};
 use std::sync::Arc;
 
-use ash::vk::{self, CommandPoolCreateFlags};
+use ash::vk::{self, CommandPoolCreateFlags, Offset3D};
 
 use super::Subbuffer;
 
@@ -148,6 +148,21 @@ impl CommandBuffer {
         };
     }
 
+    pub fn bind_index_buffer(
+        &self,
+        buffer: Arc<dyn BufferAllocation>,
+        offset: u64,
+        index_type: vk::IndexType,
+    ) {
+        unsafe {
+            self.device_raw().cmd_bind_index_buffer(
+                self.intern,
+                buffer.buffer_raw(),
+                offset,
+                index_type,
+            )
+        };
+    }
     pub fn bind_vertex_buffers(
         &self,
         first_binding: u32,
@@ -160,6 +175,26 @@ impl CommandBuffer {
             self.device_raw()
                 .cmd_bind_vertex_buffers(self.intern, first_binding, &buffers, offsets)
         };
+    }
+
+    pub fn draw_indexed(
+        &self,
+        index_count: u32,
+        instance_count: u32,
+        first_index: u32,
+        vertex_offset: i32,
+        first_instance: u32,
+    ) {
+        unsafe {
+            self.device_raw().cmd_draw_indexed(
+                self.intern,
+                index_count,
+                instance_count,
+                first_index,
+                vertex_offset,
+                first_instance,
+            )
+        }
     }
 
     pub fn draw(
@@ -192,6 +227,54 @@ impl CommandBuffer {
     }
     pub fn end_render_pass(&self) {
         unsafe { self.device_raw().cmd_end_render_pass(self.intern) };
+    }
+
+    pub fn push_constants(
+        &self,
+        layout: vk::PipelineLayout,
+        stage_flags: vk::ShaderStageFlags,
+        offset: u32,
+        constants: &[u8],
+    ) {
+        unsafe {
+            self.device_raw().cmd_push_constants(
+                self.intern,
+                layout,
+                stage_flags,
+                offset,
+                constants,
+            )
+        };
+    }
+
+    pub fn copy_buffer_to_image_dimensions(
+        &self,
+        image_buffer: Arc<dyn BufferAllocation>,
+        image: Arc<Image>,
+        offset: [u32; 3],
+        size: [u32; 3],
+    ) {
+        let regions = [vk::BufferImageCopy::default()
+            .image_offset(Offset3D {
+                x: offset[0] as i32,
+                y: offset[1] as i32,
+                z: offset[2] as i32,
+            })
+            .image_extent(vk::Extent3D {
+                width: size[0],
+                height: size[1],
+                depth: size[2],
+            })];
+
+        unsafe {
+            self.device_raw().cmd_copy_buffer_to_image(
+                self.intern,
+                image_buffer.buffer_raw(),
+                image.as_raw(),
+                image.layout(),
+                &regions,
+            )
+        };
     }
 }
 

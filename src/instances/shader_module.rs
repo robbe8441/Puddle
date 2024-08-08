@@ -1,4 +1,7 @@
-use std::{ffi::{CStr, CString}, sync::Arc};
+use std::{
+    ffi::{CStr, CString},
+    sync::Arc,
+};
 
 use crate::instances::Device;
 use anyhow::{Context, Result};

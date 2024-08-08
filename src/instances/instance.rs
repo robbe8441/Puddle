@@ -1,4 +1,7 @@
-use std::{ffi::{c_char, CStr}, sync::Arc};
+use std::{
+    ffi::{c_char, CStr},
+    sync::Arc,
+};
 
 use anyhow::Result;
 use ash::vk;
