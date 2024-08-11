@@ -76,7 +76,7 @@ impl DescriptorSet {
                         .map(|b| vk::DescriptorImageInfo {
                             sampler: vk::Sampler::null(),
                             image_view: b.as_raw(),
-                            image_layout:  vk::ImageLayout::GENERAL, //b.image().layout(),
+                            image_layout: vk::ImageLayout::GENERAL, //b.image().layout(),
                         })
                         .collect(),
                 ),

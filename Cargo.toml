@@ -10,8 +10,6 @@ bytemuck = "1.16.1"
 glam = "0.28.0"
 shaderc = "0.8.3"
 raw-window-handle = "0.6.2"
-egui = "0.18.0"
-egui-winit = "0.18.0"
 
 [target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
 raw-window-metal = "0.4.0"

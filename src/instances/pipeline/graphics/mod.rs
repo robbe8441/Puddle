@@ -19,7 +19,6 @@ pub struct PipelineCreateInfo<T> {
     pub vertex_input: T,
 }
 
-
 #[allow(unused)]
 pub enum CullMode {
     Front,
@@ -114,8 +113,3 @@ impl Into<vk::VertexInputBindingDescription> for VertexInputBinding {
         }
     }
 }
-
-
-
-
-

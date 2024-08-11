@@ -1,6 +1,6 @@
 use anyhow::Result;
 use ash::vk;
-use descriptors::{BindingDescriptor, DescriptorPool, DescriptorSet, WriteDescriptorSet};
+use descriptors::{BindingDescriptor, DescriptorSet, WriteDescriptorSet};
 use glam::{Mat4, Vec3};
 use graphics::{PipelineCreateInfo, PipelineGraphics, RenderPass, ViewportMode};
 use std::{sync::Arc, time::Instant};
@@ -108,7 +108,7 @@ fn main() -> Result<()> {
         ..Default::default()
     };
 
-    let image = Image::new(device.clone(), &image_create_info)?;
+    let image = Image::new(device.clone(), image_create_info)?;
 
     let image_view_info = ImageViewCreateInfo {
         view_type: vk::ImageViewType::TYPE_3D,
@@ -176,23 +176,21 @@ fn main() -> Result<()> {
     let compute_pipeline = vk_render::instances::compute::PipelineCompute::new(
         device.clone(),
         compute_shader,
-        model_matrix.clone(),
+        vec![model_matrix.layout()],
     )?;
-
-    let fence = Fence::new(device.clone())?;
 
     let render_pass = RenderPass::new_deafult(device.clone(), swapchain.format().format)?;
 
     let vertex_shader = ShaderModule::from_source(
         device.clone(),
-        include_str!("./shaders/vertex.glsl"),
+        include_str!("./shaders/instanced_vertex.glsl"),
         ShaderKind::Vertex,
         "main",
     )?;
 
     let fragment_shader = ShaderModule::from_source(
         device.clone(),
-        include_str!("./shaders/fragment.glsl"),
+        include_str!("./shaders/voxel.glsl"),
         ShaderKind::Fragment,
         "main",
     )?;
@@ -203,6 +201,7 @@ fn main() -> Result<()> {
         fragment_shader,
         descriptor_layouts: vec![model_matrix.layout()],
         cull_mode: graphics::CullMode::Back,
+        vertex_input: Vertex::default(),
         render_pass,
     };
 
