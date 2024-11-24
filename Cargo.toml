@@ -4,33 +4,10 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.86"
-ash = { version = "0.38.0" }
-bytemuck = "1.16.1"
-glam = "0.28.0"
-shaderc = "0.8.3"
+anyhow = "1.0.93"
+ash = "0.38.0"
+ash-window = "0.13.0"
+bytemuck = "1.20.0"
+glam = "0.29.2"
+glfw = {version = "0.58.0", features=["wayland"]}
 raw-window-handle = "0.6.2"
-
-[target.'cfg(any(target_os = "macos", target_os = "ios"))'.dependencies]
-raw-window-metal = "0.4.0"
-
-
-[dev-dependencies]
-winit = "0.29.0"
-
-[[example]]
-name = "triangle"
-path = "examples/triangle.rs"
-doc-scrape-examples = true
-
-
-[[example]]
-name = "teapod"
-path = "examples/teapod.rs"
-doc-scrape-examples = true
-
-
-[[example]]
-name = "image"
-path = "examples/image.rs"
-doc-scrape-examples = true
