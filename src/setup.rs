@@ -24,21 +24,21 @@ pub struct Vertex {
 
 unsafe impl bytemuck::NoUninit for Vertex {}
 
-
-
 impl Vertex {
     pub const VERTICES: [Vertex; 6] = [
         Vertex::new(vec2(-0.5, -0.5), vec3(1.0, 0.0, 0.0)),
         Vertex::new(vec2(0.5, 0.5), vec3(0.0, 1.0, 0.0)),
         Vertex::new(vec2(-0.5, 0.5), vec3(0.0, 0.0, 1.0)),
-
-        Vertex::new(vec2(0.5, -0.5), vec3(0.0, 1.0, 0.0)), 
-        Vertex::new(vec2(0.5, 0.5), vec3(1.0, 0.0, 0.0)), 
+        Vertex::new(vec2(0.5, -0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec2(0.5, 0.5), vec3(1.0, 0.0, 0.0)),
         Vertex::new(vec2(-0.5, -0.5), vec3(0.0, 0.0, 1.0)),
     ];
 
     pub const fn new(pos: Vec2, color: Vec3) -> Self {
-        Self { pos: [pos.x, pos.y], color: [color.x, color.y, color.z] }
+        Self {
+            pos: [pos.x, pos.y],
+            color: [color.x, color.y, color.z],
+        }
     }
 
     pub fn binding_description() -> vk::VertexInputBindingDescription {
@@ -133,12 +133,17 @@ pub unsafe fn create_instance(
 
     let debug_layers = [DEBUG_LAYER.as_ptr()];
 
+    let mut validation_features = vk::ValidationFeaturesEXT::default()
+        .enabled_validation_features(&[vk::ValidationFeatureEnableEXT::SYNCHRONIZATION_VALIDATION]);
+
     let instance_create_info = vk::InstanceCreateInfo::default()
         .application_info(&app_info)
         .enabled_extension_names(instance_extensions)
-        .enabled_layer_names(&debug_layers);
+        .enabled_layer_names(&debug_layers)
+        .push_next(&mut validation_features);
 
     let entry = ash::Entry::load()?;
+
     let instance = entry.create_instance(&instance_create_info, None)?;
 
     Ok((instance, entry))
@@ -215,9 +220,9 @@ impl DeviceQueues {
         )
     }
 
-    pub fn get_graphics_queue(&self) -> Option<(u32, MutexGuard<vk::Queue>)> {
+    pub fn get_graphics_queue(&self) -> (u32, Option<MutexGuard<vk::Queue>>) {
         let (family, queue) = &self.graphics;
-        Some((*family, queue.try_lock().ok()?))
+        (*family, queue.try_lock().ok())
     }
 }
 
@@ -350,7 +355,7 @@ impl Swapchain {
         //     .find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
         //     .unwrap_or(vk::PresentModeKHR::FIFO);
 
-        let present_mode = vk::PresentModeKHR::MAILBOX; // always supported
+        let present_mode = vk::PresentModeKHR::MAILBOX;
 
         let mut desired_image_count = surface_capabilities.min_image_count + 1;
         if surface_capabilities.max_image_count > 0

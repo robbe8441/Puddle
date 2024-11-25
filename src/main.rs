@@ -1,5 +1,7 @@
 #![allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
 
+use std::time::Instant;
+
 use anyhow::{Context, Result};
 
 mod application;
@@ -18,6 +20,8 @@ fn main() -> Result<()> {
 
     let mut app = unsafe { Application::new(&window) }?;
 
+    let mut dt = Instant::now();
+
     while !window.should_close() {
         glfw_ctx.poll_events();
 
@@ -31,6 +35,9 @@ fn main() -> Result<()> {
                 _ => {}
             }
         }
+
+        println!("fps {}", 1.0 / dt.elapsed().as_secs_f64());
+        dt = Instant::now();
 
         unsafe { app.on_render() }?;
     }
