@@ -13,32 +13,75 @@ use raw_window_handle::HasDisplayHandle;
 
 const DEBUG_LAYER: &CStr = c"VK_LAYER_KHRONOS_validation";
 
-use glam::{vec2, vec3, Vec2, Vec3};
+use glam::{vec3, Vec3};
+
+macro_rules! offset_of {
+    ($base:path, $field:ident) => {{
+        #[allow(unused_unsafe)]
+        unsafe {
+            let b: $base = std::mem::zeroed();
+            std::ptr::addr_of!(b.$field) as isize - std::ptr::addr_of!(b) as isize
+        }
+    }};
+}
 
 #[repr(C)]
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone, Debug, Default)]
 pub struct Vertex {
-    pos: [f32; 2],
-    color: [f32; 3],
+    pos: Vec3,
+    color: Vec3,
 }
 
 unsafe impl bytemuck::NoUninit for Vertex {}
 
 impl Vertex {
-    pub const VERTICES: [Vertex; 6] = [
-        Vertex::new(vec2(-0.5, -0.5), vec3(1.0, 0.0, 0.0)),
-        Vertex::new(vec2(0.5, 0.5), vec3(0.0, 1.0, 0.0)),
-        Vertex::new(vec2(-0.5, 0.5), vec3(0.0, 0.0, 1.0)),
-        Vertex::new(vec2(0.5, -0.5), vec3(0.0, 1.0, 0.0)),
-        Vertex::new(vec2(0.5, 0.5), vec3(1.0, 0.0, 0.0)),
-        Vertex::new(vec2(-0.5, -0.5), vec3(0.0, 0.0, 1.0)),
+    pub const VERTICES: [Vertex; 36] = [
+        // Vorderseite
+        Vertex::new(vec3(-0.5, -0.5, 0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(0.5, 0.5, 0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(-0.5, 0.5, 0.5), vec3(0.0, 0.0, 1.0)),
+        Vertex::new(vec3(-0.5, -0.5, 0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(0.5, -0.5, 0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 1.0)),
+        // Rückseite
+        Vertex::new(vec3(-0.5, -0.5, -0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(-0.5, 0.5, -0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(0.5, 0.5, -0.5), vec3(0.0, 0.0, 1.0)),
+        Vertex::new(vec3(-0.5, -0.5, -0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(0.5, 0.5, -0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(0.5, -0.5, -0.5), vec3(0.0, 0.0, 1.0)),
+        // Linke Seite
+        Vertex::new(vec3(-0.5, -0.5, -0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(-0.5, -0.5, 0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(-0.5, 0.5, 0.5), vec3(0.0, 0.0, 1.0)),
+        Vertex::new(vec3(-0.5, -0.5, -0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(-0.5, 0.5, 0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(-0.5, 0.5, -0.5), vec3(0.0, 0.0, 1.0)),
+        // Rechte Seite
+        Vertex::new(vec3(0.5, -0.5, -0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(0.5, 0.5, 0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(0.5, -0.5, 0.5), vec3(0.0, 0.0, 1.0)),
+        Vertex::new(vec3(0.5, -0.5, -0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(0.5, 0.5, -0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 1.0)),
+        // Oben
+        Vertex::new(vec3(-0.5, 0.5, -0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(-0.5, 0.5, 0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(0.5, 0.5, 0.5), vec3(0.0, 0.0, 1.0)),
+        Vertex::new(vec3(-0.5, 0.5, -0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(0.5, 0.5, 0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(0.5, 0.5, -0.5), vec3(0.0, 0.0, 1.0)),
+        // Unten
+        Vertex::new(vec3(-0.5, -0.5, -0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(0.5, -0.5, 0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(-0.5, -0.5, 0.5), vec3(0.0, 0.0, 1.0)),
+        Vertex::new(vec3(-0.5, -0.5, -0.5), vec3(1.0, 0.0, 0.0)),
+        Vertex::new(vec3(0.5, -0.5, -0.5), vec3(0.0, 1.0, 0.0)),
+        Vertex::new(vec3(0.5, -0.5, 0.5), vec3(0.0, 0.0, 1.0)),
     ];
 
-    pub const fn new(pos: Vec2, color: Vec3) -> Self {
-        Self {
-            pos: [pos.x, pos.y],
-            color: [color.x, color.y, color.z],
-        }
+    pub const fn new(pos: Vec3, color: Vec3) -> Self {
+        Self { pos, color }
     }
 
     pub fn binding_description() -> vk::VertexInputBindingDescription {
@@ -52,14 +95,14 @@ impl Vertex {
         let pos = vk::VertexInputAttributeDescription::default()
             .binding(0)
             .location(0)
-            .format(vk::Format::R32G32_SFLOAT)
-            .offset(0);
+            .format(vk::Format::R32G32B32_SFLOAT)
+            .offset(offset_of!(Vertex, pos) as u32);
 
         let color = vk::VertexInputAttributeDescription::default()
             .binding(0)
             .location(1)
             .format(vk::Format::R32G32B32_SFLOAT)
-            .offset(size_of::<Vec2>() as u32);
+            .offset(offset_of!(Vertex, color) as u32);
 
         [pos, color]
     }
@@ -546,7 +589,7 @@ pub unsafe fn create_pipeline(
         .polygon_mode(vk::PolygonMode::FILL)
         .line_width(1.0)
         .cull_mode(vk::CullModeFlags::BACK)
-        .front_face(vk::FrontFace::CLOCKWISE)
+        .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .depth_bias_enable(false);
 
     let multisample_state = vk::PipelineMultisampleStateCreateInfo::default()
@@ -751,8 +794,6 @@ pub unsafe fn record_buffer(
 
     Ok(())
 }
-
-pub const MAX_FRAMES_IN_FLIGHT: usize = 2;
 
 #[allow(clippy::too_many_arguments)]
 pub unsafe fn render(

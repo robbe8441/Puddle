@@ -4,8 +4,12 @@ use std::time::Instant;
 
 use anyhow::{Context, Result};
 
-mod application;
 mod setup;
+mod frame;
+mod transform;
+mod application;
+
+
 use application::Application;
 
 fn main() -> Result<()> {
@@ -36,7 +40,7 @@ fn main() -> Result<()> {
             }
         }
 
-        println!("fps {}", 1.0 / dt.elapsed().as_secs_f64());
+        // println!("fps {}", 1.0 / dt.elapsed().as_secs_f64());
         dt = Instant::now();
 
         unsafe { app.on_render() }?;
