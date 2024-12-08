@@ -1,7 +1,7 @@
+#![allow(unused)]
 use glam::{Affine3A, Mat3, Mat4, Quat, Vec3, Vec3Swizzles};
 
 /// credits : bevyengine
-
 /// Describe the position of an entity. If the entity has a parent, the position is relative
 /// to its parent position.
 ///
@@ -29,7 +29,7 @@ use glam::{Affine3A, Mat3, Mat4, Quat, Vec3, Vec3Swizzles};
 /// - [`transform`][transform_example]
 ///
 /// [transform_example]: https://github.com/bevyengine/bevy/blob/latest/examples/transforms/transform.rs
-#[derive(Debug, PartialEq, Clone, Copy)]
+#[derive(Debug, PartialEq, Clone, Copy, Default)]
 pub struct Transform {
     /// Position of the entity. In 2d, the last value of the `Vec3` is used for z-ordering.
     ///
@@ -285,7 +285,7 @@ impl Transform {
     /// If this [`Transform`] has a parent, the `axis` is relative to the rotation of the parent.
     #[inline]
     pub fn rotate_axis(&mut self, axis: Vec3, angle: f32) {
-        self.rotate(Quat::from_axis_angle(axis.into(), angle));
+        self.rotate(Quat::from_axis_angle(axis, angle));
     }
 
     /// Rotates this [`Transform`] around the `X` axis by `angle` (in radians).
@@ -323,7 +323,7 @@ impl Transform {
     /// Rotates this [`Transform`] around its local `axis` by `angle` (in radians).
     #[inline]
     pub fn rotate_local_axis(&mut self, axis: Vec3, angle: f32) {
-        self.rotate_local(Quat::from_axis_angle(axis.into(), angle));
+        self.rotate_local(Quat::from_axis_angle(axis, angle));
     }
 
     /// Rotates this [`Transform`] around its local `X` axis by `angle` (in radians).
@@ -385,11 +385,11 @@ impl Transform {
         let back = -direction.try_into().unwrap_or(Vec3::NEG_Z);
         let up = up.try_into().unwrap_or(Vec3::Y);
         let right = up
-            .cross(back.into())
+            .cross(back)
             .try_normalize()
             .unwrap_or_else(|| up.any_orthonormal_vector());
         let up = back.cross(right);
-        self.rotation = Quat::from_mat3(&Mat3::from_cols(right, up, back.into()));
+        self.rotation = Quat::from_mat3(&Mat3::from_cols(right, up, back));
     }
 
     /// Rotates this [`Transform`] so that the `main_axis` vector, reinterpreted in local coordinates, points
@@ -429,17 +429,17 @@ impl Transform {
 
         // The solution quaternion will be constructed in two steps.
         // First, we start with a rotation that takes `main_axis` to `main_direction`.
-        let first_rotation = Quat::from_rotation_arc(main_axis.into(), main_direction.into());
+        let first_rotation = Quat::from_rotation_arc(main_axis, main_direction);
 
         // Let's follow by rotating about the `main_direction` axis so that the image of `secondary_axis`
         // is taken to something that lies in the plane of `main_direction` and `secondary_direction`. Since
         // `main_direction` is fixed by this rotation, the first criterion is still satisfied.
         let secondary_image = first_rotation * secondary_axis;
         let secondary_image_ortho = secondary_image
-            .reject_from_normalized(main_direction.into())
+            .reject_from_normalized(main_direction)
             .try_normalize();
         let secondary_direction_ortho = secondary_direction
-            .reject_from_normalized(main_direction.into())
+            .reject_from_normalized(main_direction)
             .try_normalize();
 
         // If one of the two weak vectors was parallel to `main_direction`, then we just do the first part

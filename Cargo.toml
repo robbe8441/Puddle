@@ -1,13 +1,12 @@
 [package]
-name = "vk_render"
+name = "voxelvk"
 version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-anyhow = "1.0.93"
-ash = "0.38.0"
+ash = { version = "0.38.0", features = ["linked"] }
 ash-window = "0.13.0"
 bytemuck = "1.20.0"
 glam = "0.29.2"
-glfw = {version = "0.58.0", features=["wayland"]}
+glfw = { version = "0.59.0", features = ["wayland"] }
 raw-window-handle = "0.6.2"
