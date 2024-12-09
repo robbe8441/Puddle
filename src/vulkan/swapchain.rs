@@ -1,4 +1,7 @@
-use ash::{khr::swapchain, vk};
+use ash::{
+    khr::swapchain,
+    vk::{self, Handle},
+};
 
 use super::VulkanContext;
 
@@ -146,12 +149,15 @@ impl Swapchain {
             .collect())
     }
 
-    #[deprecated]
     pub unsafe fn recreate(
         &mut self,
         device: &ash::Device,
         new_extent: [u32; 2],
     ) -> Result<(), vk::Result> {
+        for fence in self.image_use_fences.iter().filter(|v| !v.is_null()) {
+            let _ = device.wait_for_fences(&[*fence], true, u64::MAX);
+        }
+
         self.create_info.image_extent = vk::Extent2D {
             width: new_extent[0],
             height: new_extent[1],
@@ -177,6 +183,8 @@ impl Swapchain {
             self.handle,
             create_info.image_format,
         )?;
+
+        self.images = self.loader.get_swapchain_images(self.handle)?;
 
         Ok(())
     }

@@ -1,4 +1,3 @@
-
 use crate::{
     vulkan::{create_pipeline, Swapchain, VulkanContext},
     MAX_FRAMES_ON_FLY,
@@ -62,6 +61,23 @@ impl Application {
     pub fn draw(&mut self) -> Result<(), vk::Result> {
         let frame = &mut self.frames[self.swapchain.current_frame];
         self.swapchain.current_frame = (self.swapchain.current_frame + 1) % MAX_FRAMES_ON_FLY;
+
+
+        self.glfw_ctx.poll_events();
+        for (_, event) in glfw::flush_messages(&self.glfw_events) {
+            match event {
+                glfw::WindowEvent::Key(glfw::Key::Escape, _, glfw::Action::Press, _) => {
+                    self.window.set_should_close(true);
+                }
+                glfw::WindowEvent::Size(x, y) => unsafe {
+                    self.vulkan_context.device.device_wait_idle()?;
+                    self.swapchain
+                        .recreate(&self.vulkan_context.device, [x as u32, y as u32])?;
+                },
+
+                _ => {}
+            }
+        }
 
         unsafe { frame.render(&mut self.swapchain, self.pipeline, &self.vulkan_context) }?;
 

@@ -260,6 +260,7 @@ impl FrameData {
     }
 
     pub unsafe fn destroy(&self) {
+        dbg!("dropped frame");
         unsafe {
             let ctx = &*self.vk_ctx;
 
