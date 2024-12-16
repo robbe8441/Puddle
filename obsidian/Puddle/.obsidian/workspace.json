@@ -1,0 +1,184 @@
+{
+  "main": {
+    "id": "613e34493afaf97e",
+    "type": "split",
+    "children": [
+      {
+        "id": "260672f8586d6715",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "32955a4003601ee4",
+            "type": "leaf",
+            "state": {
+              "type": "markdown",
+              "state": {
+                "file": "Extra/Allocators.md",
+                "mode": "source",
+                "source": false
+              },
+              "icon": "lucide-file",
+              "title": "Allocators"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "e41bbcac2a8190e0",
+    "type": "split",
+    "children": [
+      {
+        "id": "5ca906acbb4028a4",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "c5dc087293b65567",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "09478f59aa2fb3e9",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "tag:#BuddyAllocator",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "0056c96795b053c8",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ],
+        "currentTab": 1
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "8f108c9058d96c3f",
+    "type": "split",
+    "children": [
+      {
+        "id": "ba0e1960db934652",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "9cdad44c3cf2ff09",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Welcome.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for Welcome"
+            }
+          },
+          {
+            "id": "a751df72e55453a2",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Welcome.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from Welcome"
+            }
+          },
+          {
+            "id": "21267a726e56b345",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "a4701464f359bce2",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Welcome.md"
+              },
+              "icon": "lucide-list",
+              "title": "Outline of Welcome"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false
+    }
+  },
+  "active": "09478f59aa2fb3e9",
+  "lastOpenFiles": [
+    "2. Project Structure.canvas",
+    "Extra/Allocators.md",
+    "Extra",
+    "Resouce_Manager/Structure.canvas",
+    "Resouce_Manager",
+    "1. Puddle.md",
+    "Resouce.md",
+    "Resource_Manager",
+    "Renderer/Structure.canvas",
+    "Renderer/Structure.md",
+    "Renderer.md",
+    "Renderer",
+    "Project sructure.md",
+    "ProjectSetup.canvas",
+    "Welcome.md"
+  ]
+}

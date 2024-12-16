@@ -1,0 +1,28 @@
+{
+	"nodes":[
+		{"id":"9bcb9c81bbbfe839","type":"text","text":"Application(bin)","x":-320,"y":80,"width":191,"height":50,"color":"5"},
+		{"id":"796eba815fa72c17","type":"text","text":"TestBed(bin)","x":-52,"y":80,"width":181,"height":50,"color":"5"},
+		{"id":"f90b1d8e584a1370","type":"text","text":"Editor(bin)","x":200,"y":80,"width":150,"height":50,"color":"5"},
+		{"id":"d7969fee7cf88f46","type":"text","text":"Hot-reloadable\nGame Code\n(lib)","x":-320,"y":-160,"width":191,"height":89,"color":"2"},
+		{"id":"f74a073dc6ca177d","type":"text","text":"Puddle (lib)","x":-42,"y":-146,"width":163,"height":60,"color":"1"},
+		{"id":"33527c9ec4d13151","type":"text","text":"Audio","x":320,"y":-380,"width":120,"height":50,"color":"5"},
+		{"id":"1d608949f40f24a3","type":"text","text":"Input","x":480,"y":-380,"width":109,"height":50},
+		{"id":"caa39078cc84c1ef","type":"text","text":"[Resource manager](Resouce_Manager/Structure.canvas)","x":63,"y":-380,"width":212,"height":50,"color":"3"},
+		{"id":"5995594a26c3cc63","type":"text","text":"[Renderer](Renderer/Structure.canvas)","x":-122,"y":-380,"width":142,"height":50,"color":"4"},
+		{"id":"3241ad2aa3fcd928","type":"text","text":"\nAnimation\n","x":-294,"y":-380,"width":140,"height":50,"color":"6"},
+		{"id":"4c8759373416a31f","type":"text","text":"Physics","x":-480,"y":-380,"width":139,"height":50,"color":"6"}
+	],
+	"edges":[
+		{"id":"4c735b5acbe07027","fromNode":"9bcb9c81bbbfe839","fromSide":"top","toNode":"f74a073dc6ca177d","toSide":"bottom"},
+		{"id":"919a62a8da5b90c2","fromNode":"9bcb9c81bbbfe839","fromSide":"top","toNode":"d7969fee7cf88f46","toSide":"bottom"},
+		{"id":"fadfedcbd4fce5dc","fromNode":"d7969fee7cf88f46","fromSide":"right","toNode":"f74a073dc6ca177d","toSide":"left"},
+		{"id":"ba21d4f6a5d1a191","fromNode":"796eba815fa72c17","fromSide":"top","toNode":"f74a073dc6ca177d","toSide":"bottom"},
+		{"id":"c491605e0d4c2fdd","fromNode":"f90b1d8e584a1370","fromSide":"top","toNode":"f74a073dc6ca177d","toSide":"bottom"},
+		{"id":"dde168a01a152ddd","fromNode":"f74a073dc6ca177d","fromSide":"top","toNode":"5995594a26c3cc63","toSide":"bottom"},
+		{"id":"3008578a0a30bc69","fromNode":"f74a073dc6ca177d","fromSide":"top","toNode":"caa39078cc84c1ef","toSide":"bottom"},
+		{"id":"4402599836dcc02a","fromNode":"f74a073dc6ca177d","fromSide":"top","toNode":"3241ad2aa3fcd928","toSide":"bottom"},
+		{"id":"3b0ac97c1c7916ef","fromNode":"f74a073dc6ca177d","fromSide":"top","toNode":"33527c9ec4d13151","toSide":"bottom"},
+		{"id":"7bbd5f72ab8bbc24","fromNode":"f74a073dc6ca177d","fromSide":"top","toNode":"1d608949f40f24a3","toSide":"bottom"},
+		{"id":"26116fa9cb8f7697","fromNode":"f74a073dc6ca177d","fromSide":"top","toNode":"4c8759373416a31f","toSide":"bottom"}
+	]
+}

@@ -1,0 +1,9 @@
+{
+	"nodes":[
+		{"id":"4d5f75a7a55b53f3","type":"text","text":"Resource Manager","x":-92,"y":-83,"width":212,"height":60,"color":"3"},
+		{"id":"d4b7e8569383e527","type":"text","text":"Scene","x":-44,"y":-260,"width":116,"height":50}
+	],
+	"edges":[
+		{"id":"6f3154b618c835da","fromNode":"4d5f75a7a55b53f3","fromSide":"top","toNode":"d4b7e8569383e527","toSide":"bottom"}
+	]
+}
