@@ -1,0 +1,1 @@
+/home/robbe/dev/puddle/crates/allocators/target/debug/liballocators.rlib: /home/robbe/dev/puddle/crates/allocators/src/lib.rs /home/robbe/dev/puddle/crates/allocators/src/pool.rs /home/robbe/dev/puddle/crates/allocators/src/stack.rs
