@@ -1,4 +1,4 @@
-use std::{alloc::{alloc, dealloc, Layout}, ptr::null_mut};
+use std::alloc::{alloc, dealloc, Layout};
 
 use allocators::{FreeList, FreeListPtr};
 
@@ -89,7 +89,6 @@ fn dealloc_test() {
     }
 }
 
-
 #[test]
 fn padding_test() {
     unsafe {
@@ -120,8 +119,6 @@ fn padding_test() {
     }
 }
 
-
-
 #[test]
 fn dealloc_matching_nodes() {
     unsafe {
@@ -142,7 +139,6 @@ fn dealloc_matching_nodes() {
             mem
         });
 
-
         for mem in mem_list {
             allocator.dealloc(mem);
         }
@@ -158,6 +154,105 @@ fn dealloc_matching_nodes() {
         *mem3.cast() = usize::MAX - 2;
 
         allocator.dealloc(mem3);
+
+        dealloc(memory, mem_layout);
+    }
+}
+
+#[test]
+fn allocate_exact_fit() {
+    unsafe {
+        const ITEMS: usize = 3 * size_of::<usize>();
+
+        let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
+        let memory = alloc(mem_layout);
+
+        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+
+        let item_layout = Layout::new::<usize>();
+
+        // Allocate three blocks that exactly fit the memory
+        let mem1 = allocator.allocate(item_layout).unwrap();
+        let mem2 = allocator.allocate(item_layout).unwrap();
+        let mem3 = allocator.allocate(item_layout).unwrap();
+
+        *mem1.cast() = 1usize;
+        *mem2.cast() = 2usize;
+        *mem3.cast() = 3usize;
+
+        assert_eq!(*mem1.cast::<usize>(), 1);
+        assert_eq!(*mem2.cast::<usize>(), 2);
+        assert_eq!(*mem3.cast::<usize>(), 3);
+
+        // No more space available
+        assert!(allocator.allocate(item_layout).is_none());
+
+        allocator.dealloc(mem1);
+        allocator.dealloc(mem2);
+        allocator.dealloc(mem3);
+
+        dealloc(memory, mem_layout);
+    }
+}
+
+#[test]
+fn fragmentation_test() {
+    unsafe {
+        const ITEMS: usize = 10 * size_of::<usize>();
+
+        let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
+        let memory = alloc(mem_layout);
+
+        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+
+        let item_layout = Layout::new::<usize>();
+
+        let mem1 = allocator.allocate(item_layout).unwrap();
+        let mem2 = allocator.allocate(item_layout).unwrap();
+        let mem3 = allocator.allocate(item_layout).unwrap();
+
+        *mem1.cast() = 10usize;
+        *mem2.cast() = 20usize;
+        *mem3.cast() = 30usize;
+
+        allocator.dealloc(mem2);
+
+        // Allocate a smaller block in the freed space
+        let mem4 = allocator
+            .allocate(Layout::new::<u64>())
+            .unwrap();
+
+        *mem4.cast() = 40u64;
+
+        assert_eq!(*mem1.cast::<usize>(), 10);
+        assert_eq!(*mem4.cast::<u32>(), 40);
+        assert_eq!(*mem3.cast::<usize>(), 30);
+
+        allocator.dealloc(mem1);
+        allocator.dealloc(mem3);
+        allocator.dealloc(mem4);
+
+        dealloc(memory, mem_layout);
+    }
+}
+
+#[test]
+fn alignment_test() {
+    unsafe {
+        const ITEMS: usize = 32;
+
+        let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
+        let memory = alloc(mem_layout);
+
+        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+
+        let item_layout = Layout::from_size_align(16, 16).unwrap();
+
+        // Allocate memory with stricter alignment
+        let mem1 = allocator.allocate(item_layout).unwrap();
+        assert_eq!(mem1.as_ptr() as usize % 16, 0);
+
+        allocator.dealloc(mem1);
 
         dealloc(memory, mem_layout);
     }

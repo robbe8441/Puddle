@@ -24,6 +24,10 @@ impl<T> FreeListPtr<T> {
             size: self.size,
         }
     }
+
+    pub fn as_ptr(&self) -> *mut T {
+        self.ptr
+    }
 }
 impl<T> DerefMut for FreeListPtr<T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
@@ -82,6 +86,8 @@ impl FreeList {
     /// # Safety
     /// # Panics
     pub unsafe fn allocate(&mut self, layout: Layout) -> Option<FreeListPtr<c_void>> {
+        assert!(layout.size() >= size_of::<Node>(), "allocation needs to have minimum size of {}", size_of::<Node>());
+
         let mut node_index = self.head;
         let mut previous: *mut Node = null_mut();
 
@@ -186,7 +192,6 @@ impl FreeList {
         }
 
         if !p_node.is_null() {
-            dbg!("touches (1)");
             if Node::touches(p_node, ptr) {
                 (*ptr).size += (*p_node).size;
                 (*ptr).next = (*p_node).next;
