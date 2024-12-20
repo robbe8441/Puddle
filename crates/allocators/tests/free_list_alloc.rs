@@ -1,6 +1,6 @@
-use std::alloc::{alloc, dealloc, Layout};
+use std::{alloc::{alloc, dealloc, Layout}, ptr::null_mut};
 
-use allocators::FreeList;
+use allocators::{FreeList, FreeListPtr};
 
 // TODO: fix ugly tests
 
@@ -115,6 +115,49 @@ fn padding_test() {
         // 16 + 8 + 16 = 40
         // but because of padding this shouldn't work
         assert!(mem3.is_none());
+
+        dealloc(memory, mem_layout);
+    }
+}
+
+
+
+#[test]
+fn dealloc_matching_nodes() {
+    unsafe {
+        const ITEMS: usize = 8 * size_of::<usize>();
+
+        let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
+        let memory = alloc(mem_layout);
+
+        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+
+        let item_layout2 = Layout::new::<[u8; 64]>();
+        let item_layout = Layout::new::<usize>();
+
+        // allocate 8 small memory blocks
+        let mem_list: [FreeListPtr<usize>; 8] = std::array::from_fn(|_| {
+            let mut mem = allocator.allocate(item_layout).unwrap().cast::<usize>();
+            *mem = usize::MAX;
+            mem
+        });
+
+
+        for mem in mem_list {
+            allocator.dealloc(mem);
+        }
+
+        // then allocate a big one to test if they are all merged in to one big block
+        let big_data = allocator.allocate(item_layout2).unwrap();
+        *big_data.cast() = [u8::MAX - 1; 64];
+
+        // the allocator is now full and needs to free memory before allocating new one
+        allocator.dealloc(big_data);
+
+        let mem3 = allocator.allocate(item_layout).unwrap();
+        *mem3.cast() = usize::MAX - 2;
+
+        allocator.dealloc(mem3);
 
         dealloc(memory, mem_layout);
     }

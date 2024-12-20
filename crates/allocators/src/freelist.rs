@@ -16,6 +16,7 @@ pub struct FreeListPtr<T> {
 }
 
 impl<T> FreeListPtr<T> {
+    #[must_use]
     pub fn cast<B>(&self) -> FreeListPtr<B> {
         FreeListPtr {
             ptr: self.ptr.cast(),
@@ -52,10 +53,11 @@ struct Node {
 }
 
 impl Node {
-    unsafe fn touches(node: *const Node, rhs: *const Node) -> bool {
+    pub unsafe fn touches(node: *const Node, rhs: *const Node) -> bool {
         let node_size = (*node).size as usize;
         let rhs_size = (*node).size as usize;
-        node.add(node_size) == rhs || rhs.add(rhs_size) == node
+        node.cast::<i8>().add(node_size) == rhs.cast()
+            || rhs.cast::<i8>().add(rhs_size) == node.cast()
     }
 }
 
@@ -80,8 +82,6 @@ impl FreeList {
     /// # Safety
     /// # Panics
     pub unsafe fn allocate(&mut self, layout: Layout) -> Option<FreeListPtr<c_void>> {
-        assert_eq!(layout.size() % size_of::<Node>(), 0);
-
         let mut node_index = self.head;
         let mut previous: *mut Node = null_mut();
 
@@ -102,11 +102,11 @@ impl FreeList {
                     node_to_return = node_index as usize;
                 }
 
-                return Some(FreeListPtr {
+                Some(FreeListPtr {
                     ptr: self.memory.add(node_to_return + padding).cast(),
                     pad: padding as u32,
                     size,
-                });
+                })
             };
 
             match (*node_addr).size.cmp(&alloc_size) {
@@ -146,21 +146,62 @@ impl FreeList {
         None
     }
 
-    unsafe fn allocate_full_node() {}
-
     /// # Safety
     /// invalidates all pointers
     #[allow(clippy::needless_pass_by_value, clippy::cast_possible_wrap)]
     pub unsafe fn dealloc<T>(&mut self, mem: FreeListPtr<T>) {
         // get the actual pointer without padding
         let real_ptr = mem.ptr.offset(-(mem.pad as isize)).cast();
-        let mem_size = (mem.size + mem.pad) as usize;
+        let mem_size = mem.size + mem.pad;
 
-        self.dealloc_intern(real_ptr, mem_size);
+        *real_ptr = Node {
+            size: mem_size,
+            next: INVALID,
+        };
+
+        // there is no free space, so no point in checking for touching nodes
+        if self.head == INVALID {
+            self.head = real_ptr.cast::<i8>().offset_from(self.memory) as u32;
+        } else {
+            self.dealloc_intern(real_ptr);
+        }
     }
 
-    unsafe fn dealloc_intern(&mut self, ptr: *mut Node, size: usize) {
-        let node_index = self.head;
+    unsafe fn dealloc_intern(&mut self, ptr: *mut Node) {
+        let mut node_index = self.head;
+        let search_index = ptr.cast::<i8>().offset_from(self.memory) as u32;
+
+        let mut p_node: *mut Node = self.memory.add(node_index as usize).cast::<Node>();
+        let mut p_previous: *mut Node = null_mut();
+
+        // get the node after and before the deallocation (if exists)
+        while node_index < search_index {
+            node_index = (*p_node).next;
+            p_previous = p_node;
+            if node_index != INVALID {
+                p_node = self.memory.add(node_index as usize).cast::<Node>();
+            } else {
+                p_node = null_mut();
+            }
+        }
+
+        if !p_node.is_null() {
+            dbg!("touches (1)");
+            if Node::touches(p_node, ptr) {
+                (*ptr).size += (*p_node).size;
+                (*ptr).next = (*p_node).next;
+            }
+        }
+
+        if p_previous.is_null() {
+            self.head = search_index;
+        } else {
+            if Node::touches(p_previous, ptr) {
+                (*p_previous).size += (*ptr).size;
+            } else {
+                (*p_previous).next = search_index;
+            }
+        }
     }
 }
 
