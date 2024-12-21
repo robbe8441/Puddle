@@ -3,6 +3,6 @@ mod freelist;
 mod pool;
 mod stack;
 
-pub use freelist::{FreeListPtr, FreeList};
-pub use pool::PoolAllocator;
+pub use freelist::{FreeListPtr, FreeListAllocator};
+pub use pool::{PoolAllocator, TypedPoolAllocator};
 pub use stack::StackAllocator;

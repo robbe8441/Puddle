@@ -2,8 +2,6 @@ use std::alloc::{alloc, dealloc, Layout};
 
 use allocators::StackAllocator;
 
-// TODO: fix ugly tests
-
 #[test]
 fn allocate() {
     unsafe {

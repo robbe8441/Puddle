@@ -1,6 +1,6 @@
 use std::{alloc::{alloc, dealloc, Layout}, ptr::null_mut};
 
-use allocators::PoolAllocator;
+use allocators::TypedPoolAllocator as PoolAllocator;
 
 #[test]
 fn pool_alloc() {

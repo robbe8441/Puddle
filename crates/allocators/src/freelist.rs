@@ -8,6 +8,8 @@ use std::{
 
 const INVALID: u32 = u32::MAX;
 
+/// a small pointer that contains some metadata about the allocation
+/// otherwise the allocator would need to store this
 #[derive(Clone, Copy)]
 pub struct FreeListPtr<T> {
     ptr: *mut T,
@@ -25,6 +27,7 @@ impl<T> FreeListPtr<T> {
         }
     }
 
+    #[must_use]
     pub fn as_ptr(&self) -> *mut T {
         self.ptr
     }
@@ -43,7 +46,11 @@ impl<T> Deref for FreeListPtr<T> {
     }
 }
 
-pub struct FreeList {
+/// a ``FreeListAllocator`` keeps track of dynamic (de)allocations within a memory region
+/// this allocator is affected by memory fragmentation
+/// if you want to minimize fragmentation, consider using another allocator.
+/// also to improve memory usage the limit of the allocation is ``u32::MAX`` bytes (4.2 GB)
+pub struct FreeListAllocator {
     head: u32,
     memory: *mut i8,
 }
@@ -66,7 +73,7 @@ impl Node {
 }
 
 #[allow(clippy::cast_possible_truncation, clippy::cast_ptr_alignment)]
-impl FreeList {
+impl FreeListAllocator {
     /// # Safety
     /// ``memory`` and ``mem_size`` need to be valid
     /// # Panics
@@ -84,9 +91,16 @@ impl FreeList {
     }
 
     /// # Safety
+    /// should be deallocated or else it may cause a memory leak
+    /// (or is kept until the end of the program)
     /// # Panics
+    /// if the memory is smaller then the size of a Node (8 bytes)
     pub unsafe fn allocate(&mut self, layout: Layout) -> Option<FreeListPtr<c_void>> {
-        assert!(layout.size() >= size_of::<Node>(), "allocation needs to have minimum size of {}", size_of::<Node>());
+        assert!(
+            layout.size() >= size_of::<Node>(),
+            "allocation needs to have minimum size of {}",
+            size_of::<Node>()
+        );
 
         let mut node_index = self.head;
         let mut previous: *mut Node = null_mut();
@@ -153,8 +167,12 @@ impl FreeList {
     }
 
     /// # Safety
-    /// invalidates all pointers
-    #[allow(clippy::needless_pass_by_value, clippy::cast_possible_wrap)]
+    /// invalidates all pointers to this memory block
+    #[allow(
+        clippy::cast_possible_wrap,
+        clippy::cast_sign_loss,
+        clippy::needless_pass_by_value
+    )]
     pub unsafe fn dealloc<T>(&mut self, mem: FreeListPtr<T>) {
         // get the actual pointer without padding
         let real_ptr = mem.ptr.offset(-(mem.pad as isize)).cast();
@@ -173,6 +191,7 @@ impl FreeList {
         }
     }
 
+    #[allow(clippy::cast_sign_loss)]
     unsafe fn dealloc_intern(&mut self, ptr: *mut Node) {
         let mut node_index = self.head;
         let search_index = ptr.cast::<i8>().offset_from(self.memory) as u32;
@@ -184,34 +203,30 @@ impl FreeList {
         while node_index < search_index {
             node_index = (*p_node).next;
             p_previous = p_node;
-            if node_index != INVALID {
-                p_node = self.memory.add(node_index as usize).cast::<Node>();
-            } else {
+            if node_index == INVALID {
                 p_node = null_mut();
+            } else {
+                p_node = self.memory.add(node_index as usize).cast::<Node>();
             }
         }
 
-        if !p_node.is_null() {
-            if Node::touches(p_node, ptr) {
-                (*ptr).size += (*p_node).size;
-                (*ptr).next = (*p_node).next;
-            }
+        if !p_node.is_null() && Node::touches(p_node, ptr) {
+            (*ptr).size += (*p_node).size;
+            (*ptr).next = (*p_node).next;
         }
 
         if p_previous.is_null() {
             self.head = search_index;
+        } else if Node::touches(p_previous, ptr) {
+            (*p_previous).size += (*ptr).size;
         } else {
-            if Node::touches(p_previous, ptr) {
-                (*p_previous).size += (*ptr).size;
-            } else {
-                (*p_previous).next = search_index;
-            }
+            (*p_previous).next = search_index;
         }
     }
 }
 
 #[allow(clippy::cast_ptr_alignment)]
-impl Debug for FreeList {
+impl Debug for FreeListAllocator {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut list = f.debug_list();
 

@@ -1,4 +1,4 @@
-use std::{ffi::c_void, ptr::null_mut};
+use std::{ffi::c_void, marker::PhantomData, ptr::null_mut};
 
 /// a ``pool_allocator`` is used to allocate multiple allocations of the same size (pools)
 /// this can be used for example to store game objects
@@ -12,11 +12,12 @@ use std::{ffi::c_void, ptr::null_mut};
 /// every empty pool contains a pointer to the next empty pool (or null)
 /// allocating is just replacing the head with the pointer of the next empty node
 /// and returning the head
-pub struct PoolAllocator<T> {
-    head: *mut T,
+#[repr(transparent)]
+pub struct PoolAllocator {
+    head: *mut c_void,
 }
 
-impl<T> PoolAllocator<T> {
+impl PoolAllocator {
     /// # Panics
     /// if there was an issue allocating new memory
     /// if pool size is smaller than the size of a pointer
@@ -24,14 +25,7 @@ impl<T> PoolAllocator<T> {
     /// the size of the memory needs to be at least ``size_of::<T>() * pool_count``
     /// the memory needs to be deallocated manually (to allow using custom allocators)
     #[must_use]
-    pub unsafe fn new(memory: *mut c_void, pool_count: usize) -> Self {
-        let pool_size = size_of::<T>();
-
-        assert!(
-            memory.cast::<T>().is_aligned(),
-            "memory needs to have an alignment to fit a pointer : {}",
-            align_of::<usize>()
-        );
+    pub unsafe fn new(memory: *mut c_void, pool_size: usize, pool_count: usize) -> Self {
         assert!(
             pool_size >= std::mem::size_of::<usize>(),
             "a pool needs to have at least the size of an pointer: {} bytes",
@@ -62,20 +56,41 @@ impl<T> PoolAllocator<T> {
     }
 
     #[must_use]
-    pub fn allocate(&mut self) -> *mut T {
+    pub fn allocate(&mut self) -> *mut c_void {
         if self.head.is_null() {
             return null_mut();
         }
         let ptr = self.head;
-        self.head = unsafe { *self.head.cast::<*mut T>() };
+        self.head = unsafe { *self.head.cast::<*mut c_void>() };
 
         ptr
     }
 
-    pub fn free(&mut self, ptr: *mut T) {
+    pub fn free(&mut self, ptr: *mut c_void) {
         // write the current head pointer to this memory
-        unsafe { ptr.cast::<*mut T>().write(self.head) };
+        unsafe { ptr.cast::<*mut c_void>().write(self.head) };
 
         self.head = ptr;
+    }
+}
+
+#[repr(transparent)]
+pub struct TypedPoolAllocator<T> {
+    pool: PoolAllocator,
+    _maker: PhantomData<T>,
+}
+
+impl<T> TypedPoolAllocator<T> {
+    pub unsafe fn new(memory: *mut c_void, pool_count: usize) -> Self {
+        Self {
+            pool: PoolAllocator::new(memory, size_of::<T>(), pool_count),
+            _maker: PhantomData,
+        }
+    }
+    pub fn allocate(&mut self) -> *mut T {
+        self.pool.allocate().cast()
+    }
+    pub fn free(&mut self, ptr: *mut T) {
+        self.pool.free(ptr.cast());
     }
 }

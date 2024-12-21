@@ -1,6 +1,6 @@
 use std::alloc::{alloc, dealloc, Layout};
 
-use allocators::{FreeList, FreeListPtr};
+use allocators::{FreeListAllocator, FreeListPtr};
 
 // TODO: fix ugly tests
 
@@ -12,7 +12,7 @@ fn list_allocate() {
         let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
         let memory = alloc(mem_layout);
 
-        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+        let mut allocator = FreeListAllocator::new(memory.cast(), ITEMS);
 
         let item_layout = Layout::new::<usize>();
         let item_layout2 = Layout::new::<[u8; 8]>();
@@ -43,7 +43,7 @@ fn out_of_space() {
         let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
         let memory = alloc(mem_layout);
 
-        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+        let mut allocator = FreeListAllocator::new(memory.cast(), ITEMS);
 
         // allocate the full size
         allocator.allocate(mem_layout).unwrap();
@@ -64,7 +64,7 @@ fn dealloc_test() {
         let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
         let memory = alloc(mem_layout);
 
-        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+        let mut allocator = FreeListAllocator::new(memory.cast(), ITEMS);
 
         let item_layout = Layout::new::<usize>();
         let item_layout2 = Layout::new::<[u8; 8]>();
@@ -97,7 +97,7 @@ fn padding_test() {
         let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
         let memory = alloc(mem_layout);
 
-        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+        let mut allocator = FreeListAllocator::new(memory.cast(), ITEMS);
 
         let item_layout = Layout::new::<u64>();
         let item_layout2 = Layout::new::<u128>();
@@ -127,7 +127,7 @@ fn dealloc_matching_nodes() {
         let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
         let memory = alloc(mem_layout);
 
-        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+        let mut allocator = FreeListAllocator::new(memory.cast(), ITEMS);
 
         let item_layout2 = Layout::new::<[u8; 64]>();
         let item_layout = Layout::new::<usize>();
@@ -167,7 +167,7 @@ fn allocate_exact_fit() {
         let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
         let memory = alloc(mem_layout);
 
-        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+        let mut allocator = FreeListAllocator::new(memory.cast(), ITEMS);
 
         let item_layout = Layout::new::<usize>();
 
@@ -203,7 +203,7 @@ fn fragmentation_test() {
         let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
         let memory = alloc(mem_layout);
 
-        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+        let mut allocator = FreeListAllocator::new(memory.cast(), ITEMS);
 
         let item_layout = Layout::new::<usize>();
 
@@ -244,7 +244,7 @@ fn alignment_test() {
         let mem_layout = Layout::from_size_align_unchecked(ITEMS, 8);
         let memory = alloc(mem_layout);
 
-        let mut allocator = FreeList::new(memory.cast(), ITEMS);
+        let mut allocator = FreeListAllocator::new(memory.cast(), ITEMS);
 
         let item_layout = Layout::from_size_align(16, 16).unwrap();
 
