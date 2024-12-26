@@ -1,0 +1,11 @@
+[package]
+name = "triangle"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+ash = "0.38.0"
+env_logger = "0.11.6"
+glfw = "0.59.0"
+log = "0.4.22"
+rendering.path = "../../"
