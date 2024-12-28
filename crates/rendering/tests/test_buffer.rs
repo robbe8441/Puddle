@@ -1,5 +1,5 @@
 use ash::vk;
-use rendering::vulkan::{Buffer, VulkanDevice};
+use rendering::vulkan::VulkanDevice;
 
 fn main() {
     env_logger::builder()
@@ -14,7 +14,7 @@ fn main() {
 
     let vk_device = unsafe { VulkanDevice::new(&window) }.unwrap();
 
-    let data = [1u64, 2, 3, 4, 5, 6, 7, 8, 9, 10];
+    // let data = [1u64, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
-    vk_device.destroy();
+    unsafe { vk_device.destroy() };
 }

@@ -176,6 +176,10 @@ impl Swapchain {
         Ok(())
     }
 
+    pub fn image_format(&self) -> vk::Format {
+        self.create_info.image_format
+    }
+
     /// # Safety
     /// there must not currently be written on to one of the swapchain images
     pub unsafe fn destroy(&self) {

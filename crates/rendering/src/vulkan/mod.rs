@@ -1,7 +1,7 @@
 mod device;
 mod swapchain;
-mod pipeline;
+mod bindless;
 
 pub use device::*;
 pub use swapchain::*;
-pub use pipeline::*;
+pub use bindless::*;
