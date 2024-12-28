@@ -1,4 +1,4 @@
-use std::io::Cursor;
+use std::{cell::UnsafeCell, env::set_var, io::Cursor};
 
 use ash::vk;
 use rendering::vulkan::{Swapchain, VulkanDevice};
@@ -12,19 +12,24 @@ pub struct Application {
     pipeline: vk::Pipeline,
     renderpass: vk::RenderPass,
     queue: vk::Queue,
-    queue_family: u32,
     window: glfw::PWindow,
     glfw_ctx: glfw::Glfw,
     glfw_events: glfw::GlfwReceiver<(f64, glfw::WindowEvent)>,
+    render_finished_semaphore: vk::Semaphore,
+    image_available_semaphore: vk::Semaphore,
+    execution_finished_fence: vk::Fence,
+    command_bufer: UnsafeCell<Option<vk::CommandBuffer>>,
 }
 
 impl Application {
     pub fn new() -> Self {
         let mut glfw_ctx = glfw::init(glfw::fail_on_errors).unwrap();
 
-        let (window, glfw_events) = glfw_ctx
+        let (mut window, glfw_events) = glfw_ctx
             .create_window(800, 600, "Puddle triangle", glfw::WindowMode::Windowed)
             .unwrap();
+
+        window.set_all_polling(true);
 
         let vk_device = unsafe { VulkanDevice::new(&window) }.unwrap();
 
@@ -53,13 +58,6 @@ impl Application {
         }
         .unwrap();
 
-        // let command_buffer = unsafe {
-        //     let create_info = vk::CommandBufferAllocateInfo::default()
-        //         .command_pool(command_pool)
-        //         .command_buffer_count(1);
-        //     vk_device.allocate_command_buffers(&create_info).unwrap()[0]
-        // };
-
         let frame_buffers: Vec<vk::Framebuffer> = unsafe {
             (*swapchain.image_views.get())
                 .iter()
@@ -76,19 +74,159 @@ impl Application {
                 })
                 .collect()
         };
+
+        let image_available_semaphore =
+            unsafe { vk_device.create_semaphore(&vk::SemaphoreCreateInfo::default(), None) }
+                .unwrap();
+
+        let render_finished_semaphore =
+            unsafe { vk_device.create_semaphore(&vk::SemaphoreCreateInfo::default(), None) }
+                .unwrap();
+
+        let execution_finished_fence = unsafe {
+            vk_device.create_fence(
+                &vk::FenceCreateInfo::default().flags(vk::FenceCreateFlags::SIGNALED),
+                None,
+            )
+        }
+        .unwrap();
+
         Self {
             vk_device,
+            swapchain,
             command_pool,
             frame_buffers,
-            swapchain,
             pipeline_layout,
             pipeline,
             renderpass,
-            queue_family,
             queue,
             window,
             glfw_ctx,
             glfw_events,
+            render_finished_semaphore,
+            image_available_semaphore,
+            execution_finished_fence,
+            command_bufer: UnsafeCell::new(None),
+        }
+    }
+
+    unsafe fn draw(&self) {
+        let vk_device = &self.vk_device;
+
+        let _ = vk_device.wait_for_fences(&[self.execution_finished_fence], true, u64::MAX);
+        vk_device
+            .reset_fences(&[self.execution_finished_fence])
+            .unwrap();
+
+        if let Some(buffer) = *self.command_bufer.get() {
+            vk_device.free_command_buffers(self.command_pool, &[buffer]);
+        }
+
+        let (image_index, _suboptimal) = self
+            .swapchain
+            .loader
+            .acquire_next_image(
+                *self.swapchain.handle.get(),
+                u64::MAX,
+                self.image_available_semaphore,
+                vk::Fence::null(),
+            )
+            .unwrap();
+
+        let command_buffer = unsafe {
+            let create_info = vk::CommandBufferAllocateInfo::default()
+                .command_pool(self.command_pool)
+                .command_buffer_count(1);
+            vk_device.allocate_command_buffers(&create_info).unwrap()[0]
+        };
+
+        vk_device
+            .begin_command_buffer(
+                command_buffer,
+                &vk::CommandBufferBeginInfo::default()
+                    .flags(vk::CommandBufferUsageFlags::ONE_TIME_SUBMIT),
+            )
+            .unwrap();
+
+        let clear_values = [vk::ClearValue {
+            color: vk::ClearColorValue {
+                float32: [0.005, 0.001, 0.005, 1.0],
+            },
+        }];
+
+        let render_pass_begin = vk::RenderPassBeginInfo::default()
+            .render_pass(self.renderpass)
+            .framebuffer(self.frame_buffers[image_index as usize])
+            .render_area(vk::Rect2D::default().extent(self.swapchain.create_info.image_extent))
+            .clear_values(&clear_values);
+
+        vk_device.cmd_begin_render_pass(
+            command_buffer,
+            &render_pass_begin,
+            vk::SubpassContents::INLINE,
+        );
+
+        vk_device.cmd_bind_pipeline(
+            command_buffer,
+            vk::PipelineBindPoint::GRAPHICS,
+            self.pipeline,
+        );
+        vk_device.cmd_draw(command_buffer, 3, 1, 0, 0);
+
+        vk_device.cmd_end_render_pass(command_buffer);
+        vk_device.end_command_buffer(command_buffer).unwrap();
+
+        let command_bufers = [command_buffer];
+        let wait_semaphores = [self.image_available_semaphore];
+        let signal_semaphores = [self.render_finished_semaphore];
+
+        let submit_info = [vk::SubmitInfo::default()
+            .command_buffers(&command_bufers)
+            .wait_semaphores(&wait_semaphores)
+            .wait_dst_stage_mask(&[vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT])
+            .signal_semaphores(&signal_semaphores)];
+
+        vk_device
+            .queue_submit(self.queue, &submit_info, self.execution_finished_fence)
+            .unwrap();
+
+        let swapchains = [*self.swapchain.handle.get()];
+        let image_indecies = [image_index];
+
+        let present_info = vk::PresentInfoKHR::default()
+            .wait_semaphores(&signal_semaphores)
+            .swapchains(&swapchains)
+            .image_indices(&image_indecies);
+
+        self.swapchain
+            .loader
+            .queue_present(self.queue, &present_info)
+            .unwrap();
+
+        *self.command_bufer.get() = Some(command_buffer);
+    }
+
+    fn destroy(&self) {
+        let vk_device = &self.vk_device;
+
+        unsafe {
+            let _ = vk_device.device_wait_idle();
+
+            if let Some(buffer) = *self.command_bufer.get() {
+                vk_device.free_command_buffers(self.command_pool, &[buffer]);
+            }
+
+            for v in &self.frame_buffers {
+                vk_device.destroy_framebuffer(*v, None);
+            }
+            vk_device.destroy_pipeline(self.pipeline, None);
+            vk_device.destroy_render_pass(self.renderpass, None);
+            vk_device.destroy_pipeline_layout(self.pipeline_layout, None);
+            vk_device.destroy_command_pool(self.command_pool, None);
+            vk_device.destroy_semaphore(self.image_available_semaphore, None);
+            vk_device.destroy_semaphore(self.render_finished_semaphore, None);
+            self.swapchain.destroy();
+            vk_device.destroy();
         }
     }
 }
@@ -99,28 +237,38 @@ impl Default for Application {
     }
 }
 
-impl Drop for Application {
-    fn drop(&mut self) {
-        let vk_device = &self.vk_device;
-
-        unsafe {
-            for v in &self.frame_buffers {
-                vk_device.destroy_framebuffer(*v, None);
-            }
-            vk_device.destroy_render_pass(self.renderpass, None);
-            vk_device.destroy_pipeline(self.pipeline, None);
-            vk_device.destroy_pipeline_layout(self.pipeline_layout, None);
-            vk_device.destroy_command_pool(self.command_pool, None);
-            self.swapchain.destroy();
-            vk_device.destroy();
-        }
-    }
-}
-
 fn main() {
     env_logger::builder()
         .filter_level(log::LevelFilter::Trace)
         .init();
+
+    let mut app = Application::new();
+
+    while !app.window.should_close() {
+        unsafe {
+            app.draw();
+        }
+
+        app.glfw_ctx.poll_events();
+
+        for (_, event) in glfw::flush_messages(&app.glfw_events) {
+            match event {
+                glfw::WindowEvent::Key(glfw::Key::Escape, ..) | glfw::WindowEvent::Close => {
+                    app.window.set_should_close(true);
+                }
+
+                // glfw::WindowEvent::Size(x, y) => {
+                //     unsafe {
+                //         let _ = app.vk_device.device_wait_idle();
+                //         app.swapchain.recreate([x as u32, y as u32]).unwrap();
+                //     };
+                // }
+                _ => {}
+            }
+        }
+    }
+
+    app.destroy();
 }
 
 unsafe fn create_renderpass(
@@ -216,7 +364,7 @@ unsafe fn create_pipeline(
         .rasterizer_discard_enable(false)
         .polygon_mode(vk::PolygonMode::FILL)
         .line_width(1.0)
-        .cull_mode(vk::CullModeFlags::BACK)
+        .cull_mode(vk::CullModeFlags::NONE)
         .front_face(vk::FrontFace::COUNTER_CLOCKWISE)
         .depth_bias_enable(false);
 

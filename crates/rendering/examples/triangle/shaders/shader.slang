@@ -5,6 +5,7 @@ struct AssembledVertex {
 
 struct VertexStageOutput {
   float4 sv_position : SV_Position;
+  float3 color;
 };
 
 [shader("vertex")]
@@ -12,12 +13,19 @@ VertexStageOutput vertexMain(AssembledVertex assembledVertex) {
   VertexStageOutput output;
 
   float3 positions[] = {
-    float3(0.5, 0.5, 0.5),
-    float3(0.5, 0.5, 0.5),
-    float3(0.5, 0.5, 0.5),
+    float3(-0.5, 0.5, 1.0),
+    float3(0.0, -0.5, 1.0),
+    float3(0.5, 0.5, 1.0),
+  };
+
+  float3 colors[] = {
+    float3(1.0, 0.0, 0.0),
+    float3(0.0, 1.0, 0.0),
+    float3(0.0, 0.0, 1.0),
   };
 
   output.sv_position = float4(positions[assembledVertex.index], 1.0);
+  output.color = colors[assembledVertex.index];
 
   return output;
 }
@@ -26,7 +34,5 @@ VertexStageOutput vertexMain(AssembledVertex assembledVertex) {
 
 [shader("fragment")]
 float4 main_fs(VertexStageOutput input) : SV_Target {
-  float3 color = input.sv_position.xyz;
-
-  return float4(color, 1.0);
+  return float4(input.color, 1.0);
 }

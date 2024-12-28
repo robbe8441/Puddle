@@ -1,8 +1,8 @@
 {
 	"nodes":[
 		{"id":"98819d2da8550f11","type":"text","text":"Renderer","x":0,"y":-59,"width":140,"height":59,"color":"4"},
-		{"id":"68720b03fb4ed1cb","x":70,"y":-340,"width":250,"height":60,"type":"text","text":""},
-		{"id":"47b837811ce0b17b","x":-200,"y":-340,"width":250,"height":60,"type":"text","text":""}
+		{"id":"68720b03fb4ed1cb","type":"text","text":"","x":70,"y":-340,"width":250,"height":60},
+		{"id":"47b837811ce0b17b","type":"text","text":"[Vulkan](obsidian://open?vault=Puddle&file=Renderer%2FVulkan)","x":-100,"y":-340,"width":140,"height":60}
 	],
 	"edges":[
 		{"id":"6b6aea34fd0ee9bf","fromNode":"98819d2da8550f11","fromSide":"top","toNode":"68720b03fb4ed1cb","toSide":"bottom"},

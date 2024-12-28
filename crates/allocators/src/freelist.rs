@@ -79,7 +79,7 @@ impl FreeListAllocator {
     /// # Panics
     /// if the size is bigger than ``u32::MAX``
     pub unsafe fn new(memory: *mut i8, mem_size: usize) -> Self {
-        assert!(mem_size < u32::MAX as usize);
+        assert!(u32::try_from(mem_size).is_ok());
         assert!(memory.is_aligned_to(align_of::<Node>()));
 
         *memory.cast::<Node>() = Node {

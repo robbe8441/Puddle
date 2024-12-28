@@ -141,10 +141,10 @@ impl Swapchain {
     /// for example if no space if left
     pub unsafe fn recreate(
         &self,
-        device: &ash::Device,
         new_extent: [u32; 2],
     ) -> Result<(), vk::Result> {
         let handle = self.handle.get();
+        let device = &*self.device;
 
         let image_extent = vk::Extent2D {
             width: new_extent[0],

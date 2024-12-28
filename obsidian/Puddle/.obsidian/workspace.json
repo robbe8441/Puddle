@@ -11,14 +11,17 @@
             "id": "32955a4003601ee4",
             "type": "leaf",
             "state": {
-              "type": "markdown",
+              "type": "canvas",
               "state": {
-                "file": "Extra/Allocators.md",
-                "mode": "source",
-                "source": false
+                "file": "Resouce_Manager/Structure.canvas",
+                "viewState": {
+                  "x": 14,
+                  "y": -141.5,
+                  "zoom": 0
+                }
               },
-              "icon": "lucide-file",
-              "title": "Allocators"
+              "icon": "lucide-layout-dashboard",
+              "title": "Structure"
             }
           }
         ]
@@ -52,7 +55,7 @@
             "state": {
               "type": "search",
               "state": {
-                "query": "tag:#BuddyAllocator",
+                "query": "",
                 "matchingCase": false,
                 "explainSearch": false,
                 "collapseAll": false,
@@ -73,8 +76,7 @@
               "title": "Bookmarks"
             }
           }
-        ],
-        "currentTab": 1
+        ]
       }
     ],
     "direction": "horizontal",
@@ -163,17 +165,18 @@
       "command-palette:Open command palette": false
     }
   },
-  "active": "09478f59aa2fb3e9",
+  "active": "32955a4003601ee4",
   "lastOpenFiles": [
     "2. Project Structure.canvas",
+    "Resouce.md",
+    "1. Puddle.md",
+    "Renderer/Structure.canvas",
+    "Renderer/Vulkan.md",
     "Extra/Allocators.md",
     "Extra",
     "Resouce_Manager/Structure.canvas",
     "Resouce_Manager",
-    "1. Puddle.md",
-    "Resouce.md",
     "Resource_Manager",
-    "Renderer/Structure.canvas",
     "Renderer/Structure.md",
     "Renderer.md",
     "Renderer",
