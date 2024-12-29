@@ -6,12 +6,14 @@ use ash::vk;
 const DEBUG_LAYER: &std::ffi::CStr = c"VK_LAYER_KHRONOS_validation";
 
 #[allow(unused)]
+#[repr(C)]
 pub struct VulkanDevice {
     pub entry: ash::Entry,
     pub instance: ash::Instance,
 
     pub pdevice: vk::PhysicalDevice,
     pub device: ash::Device,
+    pub shader_device: ash::ext::shader_object::Device,
     pub queues: DeviceQueues,
 
     pub surface: vk::SurfaceKHR,
@@ -49,6 +51,8 @@ impl VulkanDevice {
 
         let (device, queues) = create_device(&instance, pdevice)?;
 
+        let shader_device = ash::ext::shader_object::Device::new(&instance, &device);
+
         Ok(Self {
             #[cfg(debug_assertions)]
             debugger: debug::setup_debugger(&instance, &entry),
@@ -56,6 +60,7 @@ impl VulkanDevice {
             instance,
             pdevice,
             device,
+            shader_device,
             queues,
             surface,
             surface_loader,
@@ -90,6 +95,7 @@ unsafe fn create_instance(
 
     let mut extensions =
         ash_window::enumerate_required_extensions(display_handle.as_raw())?.to_vec();
+    // 11:42
 
     #[cfg(debug_assertions)]
     extensions.push(ash::ext::debug_utils::NAME.as_ptr());
@@ -212,13 +218,24 @@ unsafe fn create_device(
     ];
 
     let device_extensions = [
+        ash::khr::dynamic_rendering::NAME.as_ptr(),
+        ash::ext::shader_object::NAME.as_ptr(),
         ash::khr::swapchain::NAME.as_ptr(),
         #[cfg(any(target_os = "macos", target_os = "ios"))]
         ash::khr::portability_subset::NAME.as_ptr(),
     ];
+
+    let mut dynamic_rendering_features =
+        vk::PhysicalDeviceDynamicRenderingFeatures::default().dynamic_rendering(true);
+
+    let mut shader_object_features =
+        vk::PhysicalDeviceShaderObjectFeaturesEXT::default().shader_object(true);
+
     let device_create_info = vk::DeviceCreateInfo::default()
         .queue_create_infos(&queue_infos)
-        .enabled_extension_names(&device_extensions);
+        .enabled_extension_names(&device_extensions)
+        .push_next(&mut dynamic_rendering_features)
+        .push_next(&mut shader_object_features);
 
     let device = instance.create_device(pdevice, &device_create_info, None)?;
 

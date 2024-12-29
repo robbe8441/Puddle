@@ -9,7 +9,7 @@ struct VertexStageOutput {
 };
 
 [shader("vertex")]
-VertexStageOutput vertexMain(AssembledVertex assembledVertex) {
+VertexStageOutput main_vs(AssembledVertex assembledVertex) {
   VertexStageOutput output;
 
   float3 positions[] = {

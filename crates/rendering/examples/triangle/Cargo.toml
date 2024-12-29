@@ -5,7 +5,8 @@ edition = "2021"
 
 [dependencies]
 ash = "0.38.0"
+bytemuck = "1.21.0"
 env_logger = "0.11.6"
-glfw = "0.59.0"
+glfw = {version = "0.59.0", features = ["wayland"]}
 log = "0.4.22"
 rendering.path = "../../"

@@ -7,9 +7,8 @@ use super::VulkanDevice;
 pub struct Swapchain {
     pub handle: UnsafeCell<vk::SwapchainKHR>,
     pub loader: ash::khr::swapchain::Device,
-    device: *const VulkanDevice,
     pub image_views: UnsafeCell<Vec<vk::ImageView>>,
-    pub create_info: vk::SwapchainCreateInfoKHR<'static>,
+    pub create_info: UnsafeCell<vk::SwapchainCreateInfoKHR<'static>>,
 }
 
 impl Swapchain {
@@ -54,8 +53,6 @@ impl Swapchain {
             .find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
             .unwrap_or(vk::PresentModeKHR::FIFO);
 
-        // let present_mode = vk::PresentModeKHR::MAILBOX;
-
         let mut desired_image_count = surface_capabilities.min_image_count + 1;
         if surface_capabilities.max_image_count > 0
             && desired_image_count > surface_capabilities.max_image_count
@@ -89,10 +86,9 @@ impl Swapchain {
         )?;
 
         Ok(Self {
-            device,
             handle: UnsafeCell::new(swapchain),
             loader: swapchain_loader,
-            create_info: swapchain_create_info,
+            create_info: UnsafeCell::new(swapchain_create_info),
             image_views: UnsafeCell::new(image_views),
         })
     }
@@ -141,20 +137,21 @@ impl Swapchain {
     /// for example if no space if left
     pub unsafe fn recreate(
         &self,
+        device: &ash::Device,
         new_extent: [u32; 2],
     ) -> Result<(), vk::Result> {
         let handle = self.handle.get();
-        let device = &*self.device;
 
         let image_extent = vk::Extent2D {
             width: new_extent[0],
             height: new_extent[1],
         };
 
+        (*self.create_info.get()).image_extent = image_extent;
+
         let create_info = vk::SwapchainCreateInfoKHR {
             old_swapchain: *handle,
-            image_extent,
-            ..self.create_info
+            ..*self.create_info.get()
         };
 
         *handle = self.loader.create_swapchain(&create_info, None)?;
@@ -177,18 +174,17 @@ impl Swapchain {
     }
 
     pub fn image_format(&self) -> vk::Format {
-        self.create_info.image_format
+        unsafe { (*self.create_info.get()).image_format }
     }
 
     /// # Safety
     /// there must not currently be written on to one of the swapchain images
-    pub unsafe fn destroy(&self) {
-        let device = &*self.device;
-
+    pub unsafe fn destroy(&self, device: &ash::Device) {
         for view in &*self.image_views.get() {
             device.destroy_image_view(*view, None);
         }
 
-        self.loader.destroy_swapchain(*self.handle.get(), None);
+        let handle = *self.handle.get();
+        self.loader.destroy_swapchain(handle, None);
     }
 }
