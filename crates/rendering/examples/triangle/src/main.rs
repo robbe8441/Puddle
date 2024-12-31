@@ -1,6 +1,7 @@
 use std::{cell::UnsafeCell, io::Cursor};
 
 use ash::vk;
+use ash::prelude::VkResult;
 use rendering::vulkan::{Swapchain, VulkanDevice};
 
 pub struct Application {
@@ -15,11 +16,11 @@ pub struct Application {
     image_available_semaphore: vk::Semaphore,
     execution_finished_fence: vk::Fence,
     command_bufer: UnsafeCell<Option<vk::CommandBuffer>>,
-    shaders: [vk::ShaderEXT; 2],
+    shaders: [vk::ShaderEXT; 3],
 }
 
 impl Application {
-    unsafe fn new() -> Result<Self, vk::Result> {
+    unsafe fn new() -> VkResult<Self> {
         let mut glfw_ctx = glfw::init(glfw::fail_on_errors).unwrap();
 
         let (mut window, glfw_events) = glfw_ctx
@@ -56,24 +57,19 @@ impl Application {
             None,
         )?;
 
-        // stage,
-        // next_stage,
-        // code_type,
-        // code_size,
-        // p_code,
-        // p_name,
-        // set_layout_count,
-        // p_set_layouts,
-        // push_constant_range_count,
-        // p_push_constant_ranges,
-        // p_specialization_info,
-
         let mut code = Cursor::new(include_bytes!("../shaders/shader_opt.spv"));
         let byte_code = ash::util::read_spv(&mut code).unwrap();
+
+        let mut code2 = Cursor::new(include_bytes!("../shaders/quad.spv"));
+        let byte_code2 = ash::util::read_spv(&mut code2).unwrap();
 
         let shader_info = vk::ShaderCreateInfoEXT::default()
             .code_type(vk::ShaderCodeTypeEXT::SPIRV)
             .code(bytemuck::cast_slice(&byte_code));
+
+        let shader_info2 = vk::ShaderCreateInfoEXT::default()
+            .code_type(vk::ShaderCodeTypeEXT::SPIRV)
+            .code(bytemuck::cast_slice(&byte_code2));
 
         let shader_crate_infos = [
             vk::ShaderCreateInfoEXT {
@@ -81,6 +77,12 @@ impl Application {
                 next_stage: vk::ShaderStageFlags::FRAGMENT,
                 p_name: c"main".as_ptr(),
                 ..shader_info
+            },
+            vk::ShaderCreateInfoEXT {
+                stage: vk::ShaderStageFlags::VERTEX,
+                p_name: c"main".as_ptr(),
+                next_stage: vk::ShaderStageFlags::FRAGMENT,
+                ..shader_info2
             },
             vk::ShaderCreateInfoEXT {
                 stage: vk::ShaderStageFlags::FRAGMENT,
@@ -150,11 +152,6 @@ impl Application {
             )
             .unwrap();
 
-        let clear_value = vk::ClearValue {
-            color: vk::ClearColorValue {
-                float32: [0.05, 0.01, 0.07, 1.0],
-            },
-        };
 
         let swapchain_views = &*self.swapchain.image_views.get();
         let swapchain_images = self
@@ -163,12 +160,6 @@ impl Application {
             .get_swapchain_images(*self.swapchain.handle.get())
             .unwrap();
 
-        let color_attachments = [vk::RenderingAttachmentInfo::default()
-            .load_op(vk::AttachmentLoadOp::CLEAR)
-            .store_op(vk::AttachmentStoreOp::STORE)
-            .clear_value(clear_value)
-            .image_view(swapchain_views[image_index as usize])
-            .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)];
 
         let barrier = vk::ImageMemoryBarrier::default()
             .src_access_mask(vk::AccessFlags::empty())
@@ -204,6 +195,19 @@ impl Application {
 
         let image_size = (*self.swapchain.create_info.get()).image_extent;
 
+        let clear_value = vk::ClearValue {
+            color: vk::ClearColorValue {
+                float32: [0.05, 0.01, 0.07, 1.0],
+            },
+        };
+
+        let color_attachments = [vk::RenderingAttachmentInfo::default()
+            .load_op(vk::AttachmentLoadOp::CLEAR)
+            .store_op(vk::AttachmentStoreOp::STORE)
+            .clear_value(clear_value)
+            .image_view(swapchain_views[image_index as usize])
+            .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)];
+
         let render_begin = vk::RenderingInfo::default()
             .render_area(vk::Rect2D::default().extent(image_size))
             .layer_count(1)
@@ -211,12 +215,6 @@ impl Application {
             .color_attachments(&color_attachments);
 
         vk_device.cmd_begin_rendering(command_buffer, &render_begin);
-
-        let stages = [vk::ShaderStageFlags::VERTEX, vk::ShaderStageFlags::FRAGMENT];
-
-        vk_device
-            .shader_device
-            .cmd_bind_shaders(command_buffer, &stages, &self.shaders);
 
         vk_device.cmd_set_viewport_with_count(
             command_buffer,
@@ -253,7 +251,23 @@ impl Application {
         );
         s_device.cmd_set_color_write_mask(command_buffer, 0, &[vk::ColorComponentFlags::RGBA]);
 
+        let stages = [vk::ShaderStageFlags::VERTEX, vk::ShaderStageFlags::FRAGMENT];
+        let vertex1 = self.shaders[0];
+        let vertex2 = self.shaders[1];
+        let fragment = self.shaders[2];
+
+        vk_device
+            .shader_device
+            .cmd_bind_shaders(command_buffer, &stages, &[vertex2, fragment]);
+
+        vk_device.cmd_draw(command_buffer, 6, 1, 0, 0);
+
+        vk_device
+            .shader_device
+            .cmd_bind_shaders(command_buffer, &stages, &[vertex1, fragment]);
+
         vk_device.cmd_draw(command_buffer, 3, 1, 0, 0);
+
         vk_device.cmd_end_rendering(command_buffer);
 
         vk_device.cmd_pipeline_barrier(
@@ -314,12 +328,9 @@ impl Application {
             vk_device.destroy_semaphore(self.render_finished_semaphore, None);
             vk_device.destroy_fence(self.execution_finished_fence, None);
 
-            vk_device
-                .shader_device
-                .destroy_shader(self.shaders[0], None);
-            vk_device
-                .shader_device
-                .destroy_shader(self.shaders[1], None);
+            for shader in self.shaders {
+                vk_device.shader_device.destroy_shader(shader, None);
+            }
 
             self.swapchain.destroy(vk_device);
             vk_device.destroy();

@@ -2,22 +2,22 @@ use std::cell::UnsafeCell;
 
 use ash::vk;
 
+use ash::prelude::VkResult;
+
 use super::VulkanDevice;
 
 pub struct Swapchain {
     pub handle: UnsafeCell<vk::SwapchainKHR>,
     pub loader: ash::khr::swapchain::Device,
     pub image_views: UnsafeCell<Vec<vk::ImageView>>,
+    pub image_available_fences: UnsafeCell<Vec<vk::Fence>>,
     pub create_info: UnsafeCell<vk::SwapchainCreateInfoKHR<'static>>,
 }
 
 impl Swapchain {
     /// # Safety
     /// # Errors
-    pub unsafe fn new(
-        device: &VulkanDevice,
-        image_extent: [u32; 2],
-    ) -> Result<Swapchain, vk::Result> {
+    pub unsafe fn new(device: &VulkanDevice, image_extent: [u32; 2]) -> VkResult<Self> {
         let surface_capabilities = device
             .surface_loader
             .get_physical_device_surface_capabilities(device.pdevice, device.surface)?;
@@ -90,6 +90,10 @@ impl Swapchain {
             loader: swapchain_loader,
             create_info: UnsafeCell::new(swapchain_create_info),
             image_views: UnsafeCell::new(image_views),
+            image_available_fences: UnsafeCell::new(vec![
+                vk::Fence::null();
+                desired_image_count as usize
+            ]),
         })
     }
 
@@ -98,7 +102,7 @@ impl Swapchain {
         swapchain_loader: &ash::khr::swapchain::Device,
         swapchain: vk::SwapchainKHR,
         format: vk::Format,
-    ) -> Result<Vec<vk::ImageView>, vk::Result> {
+    ) -> VkResult<Vec<vk::ImageView>> {
         let swapchain_images = swapchain_loader.get_swapchain_images(swapchain)?;
 
         Ok(swapchain_images
@@ -135,11 +139,7 @@ impl Swapchain {
     /// # Errors
     /// if there was an issue allocating new images
     /// for example if no space if left
-    pub unsafe fn recreate(
-        &self,
-        device: &ash::Device,
-        new_extent: [u32; 2],
-    ) -> Result<(), vk::Result> {
+    pub unsafe fn recreate(&self, device: &ash::Device, new_extent: [u32; 2]) -> VkResult<()> {
         let handle = self.handle.get();
 
         let image_extent = vk::Extent2D {

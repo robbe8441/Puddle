@@ -2,6 +2,8 @@ use std::ops::Deref;
 
 use ash::vk;
 
+use ash::prelude::VkResult;
+
 #[cfg(debug_assertions)]
 const DEBUG_LAYER: &std::ffi::CStr = c"VK_LAYER_KHRONOS_validation";
 
@@ -28,7 +30,7 @@ impl VulkanDevice {
     /// # Panics
     /// # Errors
     /// if the vulkan API isn't available
-    pub unsafe fn new<T>(window: &T) -> Result<Self, vk::Result>
+    pub unsafe fn new<T>(window: &T) -> VkResult<Self>
     where
         T: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle,
     {
@@ -90,7 +92,7 @@ impl Deref for VulkanDevice {
 /// as vulkan doesn't use global variables for that
 unsafe fn create_instance(
     display_handle: &raw_window_handle::DisplayHandle,
-) -> Result<(ash::Instance, ash::Entry), vk::Result> {
+) -> VkResult<(ash::Instance, ash::Entry)> {
     let entry = ash::Entry::load().unwrap();
 
     let mut extensions =
@@ -147,7 +149,7 @@ unsafe fn get_physical_device(
     instance: &ash::Instance,
     surface_loader: &ash::khr::surface::Instance,
     surface: vk::SurfaceKHR,
-) -> Result<vk::PhysicalDevice, vk::Result> {
+) -> VkResult<vk::PhysicalDevice> {
     let pdevices = instance.enumerate_physical_devices()?;
 
     let pdevice = pdevices
@@ -194,7 +196,7 @@ pub struct DeviceQueues {
 unsafe fn create_device(
     instance: &ash::Instance,
     pdevice: vk::PhysicalDevice,
-) -> Result<(ash::Device, DeviceQueues), vk::Result> {
+) -> VkResult<(ash::Device, DeviceQueues)> {
     let queue_props = instance.get_physical_device_queue_family_properties(pdevice);
 
     // use unwrap here because we already know that it supports all of them and should not error

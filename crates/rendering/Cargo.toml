@@ -8,6 +8,7 @@ allocators.path = "../allocators/"
 ash = "0.38.0"
 ash-window = "0.13.0"
 bitflags = "2.6.0"
+glam = "0.29.2"
 log = "0.4.22"
 raw-window-handle = "0.6.2"
 
