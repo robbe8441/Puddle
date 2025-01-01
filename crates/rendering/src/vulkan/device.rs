@@ -68,14 +68,18 @@ impl VulkanDevice {
             surface_loader,
         })
     }
+}
 
-    pub unsafe fn destroy(&self) {
-        let _ = self.device.device_wait_idle();
-        #[cfg(debug_assertions)]
-        self.debugger.destroy();
-        self.surface_loader.destroy_surface(self.surface, None);
-        self.device.destroy_device(None);
-        self.instance.destroy_instance(None);
+impl Drop for VulkanDevice {
+    fn drop(&mut self) {
+        unsafe {
+            let _ = self.device.device_wait_idle();
+            #[cfg(debug_assertions)]
+            self.debugger.destroy();
+            self.surface_loader.destroy_surface(self.surface, None);
+            self.device.destroy_device(None);
+            self.instance.destroy_instance(None);
+        }
     }
 }
 

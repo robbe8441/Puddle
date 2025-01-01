@@ -5,9 +5,12 @@ VertexStageOutput vs_quad(AssembledVertex assembledVertex) {
   VertexStageOutput output;
 
   float3 positions[] = {
-    float3(-0.5, 0.5, 1.0), float3(-0.5, -0.5, 1.0), float3(0.5, -0.5, 1.0),
-
-    float3(-0.5, 0.5, 1.0), float3(0.5, -0.5, 1.0),  float3(0.5, 0.5, 1.0),
+    float3(-0.5, 0.5, 1.0),
+    float3(-0.5, -0.5, 1.0),
+    float3(0.5, -0.5, 1.0),
+    float3(-0.5, 0.5, 1.0),
+    float3(0.5, -0.5, 1.0),
+    float3(0.5, 0.5, 1.0),
   };
 
   float3 colors[] = {

@@ -1,22 +1,24 @@
-mod frame;
-pub mod render_context;
-use std::cell::{Cell, UnsafeCell};
-
-use ash::prelude::VkResult;
+use crate::vulkan::{Swapchain, VulkanDevice};
+use ash::{prelude::VkResult, vk};
+use bindless::{BindlessHandler, BindlessResourceHandle};
 use frame::FrameContext;
 use render_context::RenderBatch;
+use std::sync::Arc;
 
-use crate::vulkan::{Swapchain, VulkanDevice};
+mod bindless;
+mod frame;
+pub mod render_context;
 
 /// max frames that can be Prerecorded, makes the render smoother but more delayed
 pub const FLYING_FRAMES: usize = 3;
 
 pub struct RenderHandler {
-    pub device: VulkanDevice,
+    pub device: Arc<VulkanDevice>,
     swapchain: Swapchain,
     frames: [FrameContext; FLYING_FRAMES],
-    batches: UnsafeCell<Vec<RenderBatch>>,
-    frame_index: Cell<usize>,
+    batches: Vec<RenderBatch>,
+    bindless_handler: BindlessHandler,
+    frame_index: usize,
 }
 
 impl RenderHandler {
@@ -26,24 +28,49 @@ impl RenderHandler {
     where
         T: raw_window_handle::HasWindowHandle + raw_window_handle::HasDisplayHandle,
     {
-        let device = unsafe { VulkanDevice::new(window)? };
+        let device = unsafe { Arc::new(VulkanDevice::new(window)?) };
 
-        let swapchain = unsafe { Swapchain::new(&device, window_size) }?;
+        let swapchain = unsafe { Swapchain::new(device.clone(), window_size) }?;
 
         let frames = std::array::from_fn(|_| unsafe { FrameContext::new(&device).unwrap() });
+
+        let bindless_handler = BindlessHandler::new(&device)?;
 
         Ok(Self {
             device,
             swapchain,
             frames,
-            batches: UnsafeCell::new(vec![]),
-            frame_index: Cell::new(0),
+            batches: vec![],
+            bindless_handler,
+            frame_index: 0,
         })
     }
 
-    pub fn add_render_batch(&self, batch: RenderBatch) {
-        let batches = unsafe {&mut *self.batches.get()};
-        batches.push(batch);
+    #[inline]
+    pub fn add_render_batch(&mut self, batch: RenderBatch) {
+        self.batches.push(batch);
+    }
+
+    #[inline]
+    pub fn set_uniform_buffer(&mut self, buffer: vk::Buffer) -> BindlessResourceHandle {
+        self.bindless_handler
+            .set_uniform_buffer(&self.device, buffer)
+    }
+
+    #[inline]
+    pub fn set_storage_buffer(&mut self, buffer: vk::Buffer) -> BindlessResourceHandle {
+        self.bindless_handler
+            .set_storage_buffer(&self.device, buffer)
+    }
+
+    #[inline]
+    pub fn set_storage_image(
+        &mut self,
+        image: vk::ImageView,
+        layout: vk::ImageLayout,
+    ) -> BindlessResourceHandle {
+        self.bindless_handler
+            .set_storage_image(&self.device, image, layout)
     }
 
     /// # Errors
@@ -56,11 +83,10 @@ impl RenderHandler {
 
     /// # Safety
     /// # Errors
-    pub unsafe fn draw(&self) -> VkResult<()> {
-        let frame = self.frame_index.get();
-        self.frames[frame].execute(&self.device, &self.swapchain, &*self.batches.get())?;
+    pub unsafe fn draw(&mut self) -> VkResult<()> {
+        self.frames[self.frame_index].execute(&self.device, &self.swapchain, &self.batches)?;
 
-        self.frame_index.set((frame + 1) % FLYING_FRAMES);
+        self.frame_index = (self.frame_index + 1) % FLYING_FRAMES;
         Ok(())
     }
 }
@@ -72,8 +98,7 @@ impl Drop for RenderHandler {
             for frame in &self.frames {
                 frame.destroy(&self.device);
             }
-            self.swapchain.destroy(&self.device);
-            self.device.destroy();
+            self.bindless_handler.destroy(&self.device);
         }
     }
 }

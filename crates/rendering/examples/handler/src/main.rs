@@ -7,6 +7,7 @@ use rendering::{
         RenderHandler,
     },
     types::Material,
+    vulkan::Buffer,
 };
 
 pub struct DefaultMaterial {
@@ -25,6 +26,7 @@ impl Material for DefaultMaterial {
     }
 }
 
+#[allow(clippy::too_many_lines)]
 fn main() {
     env_logger::builder()
         .filter_level(log::LevelFilter::Trace)
@@ -41,7 +43,7 @@ fn main() {
         [v.0 as u32, v.1 as u32]
     };
 
-    let handler = RenderHandler::new(&window, window_size).unwrap();
+    let mut handler = RenderHandler::new(&window, window_size).unwrap();
 
     let mut code = Cursor::new(include_bytes!("../shaders/shader.spv"));
     let byte_code = ash::util::read_spv(&mut code).unwrap();
@@ -74,13 +76,54 @@ fn main() {
     .try_into()
     .unwrap();
 
+    let vertex_data = [
+        [-0.5, 0.5, 1.0, 1.0],
+        [-0.5, -0.5, 1.0, 1.0],
+        [0.5, -0.5, 1.0, 1.0],
+        [-0.5, 0.5, 1.0, 1.0],
+        [0.5, -0.5, 1.0, 1.0],
+        [0.5, 0.5, 1.0, 1.0],
+    ];
+
+    let vertex_buffer = Buffer::new(
+        handler.device.clone(),
+        std::mem::size_of_val(&vertex_data) as u64,
+        vk::BufferUsageFlags::VERTEX_BUFFER,
+        vk::MemoryPropertyFlags::HOST_VISIBLE,
+    )
+    .unwrap();
+
+    unsafe {
+        let ptr = handler
+            .device
+            .map_memory(
+                vertex_buffer.mem_ref().handle(),
+                0,
+                vk::WHOLE_SIZE,
+                vk::MemoryMapFlags::empty(),
+            )
+            .unwrap();
+
+        let mut align: ash::util::Align<[f32; 4]> = ash::util::Align::new(
+            ptr,
+            std::mem::align_of::<f32>() as u64,
+            std::mem::size_of_val(&vertex_data) as u64,
+        );
+
+        align.copy_from_slice(&vertex_data);
+    }
+
     let material = DefaultMaterial { shaders };
 
     let mut render_batch = RenderBatch::default();
     render_batch.set_material(Arc::new(material));
 
     let draw_data = DrawData {
-        vertex_count: 3,
+        vertex_buffer: Some(vertex_buffer),
+        vertex_count: 6,
+        vertex_size: std::mem::size_of::<[f32; 4]>() as u32,
+        vertex_attribute_descriptions: vec![vk::VertexInputAttributeDescription2EXT::default()
+            .format(vk::Format::R32G32B32A32_SFLOAT)],
         ..Default::default()
     };
 

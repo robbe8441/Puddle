@@ -1,31 +1,21 @@
-use std::sync::Arc;
-
+use crate::{
+    types::Material,
+    vulkan::{Buffer, VulkanDevice},
+};
 use ash::vk;
-use bitflags::bitflags;
 use log::error;
-
-use crate::{types::Material, vulkan::VulkanDevice};
-
-bitflags! {
-    #[derive(Default)]
-    pub struct DrawMode: u32 {
-        const VERTEX_BUFFER = 0b1;
-        const INDEX_BUFFER = 0b01;
-        const INSTANCE_BUFFER = 0b001;
-    }
-}
+use std::sync::Arc;
 
 #[derive(Default)]
 pub struct DrawData {
-    pub mode: DrawMode,
     /// must be set if mode contains ``VERTEX_BUFFER``
-    pub vertex_buffer: vk::Buffer,
+    pub vertex_buffer: Option<Buffer>,
     /// must be set if mode contains ``INDEX_BUFFER``
-    pub index_buffer: vk::Buffer,
+    pub index_buffer: Option<Buffer>,
     /// must be set if mode contains ``INDEX_BUFFER``
     pub index_type: vk::IndexType,
     /// must be set if mode contains ``INSTANCE_BUFFER``
-    pub instance_buffer: vk::Buffer,
+    pub instance_buffer: Option<Buffer>,
     /// defaults to 1 (cant be 0)
     pub instance_count: u32,
     /// must be set if mode contains ``INDEX_BUFFER``
@@ -48,38 +38,41 @@ impl DrawData {
         let mut vertex_attribute_desc = vec![];
         let mut vertex_buffers = vec![];
 
-        if self.mode.contains(DrawMode::VERTEX_BUFFER) {
+        if let Some(vertex_b) = &self.vertex_buffer {
+            debug_assert!(self.vertex_size > 0);
             vertex_input_desc.push(
                 vk::VertexInputBindingDescription2EXT::default()
                     .stride(self.vertex_size)
+                    .divisor(1)
                     .input_rate(vk::VertexInputRate::VERTEX),
             );
-            vertex_buffers.push(self.vertex_buffer);
+            vertex_buffers.push(vertex_b.handle());
             vertex_attribute_desc.extend(self.vertex_attribute_descriptions.iter());
         }
 
-        if self.mode.contains(DrawMode::INSTANCE_BUFFER) {
+        if let Some(instance_b) = &self.instance_buffer {
+            debug_assert!(self.instance_size > 0);
             vertex_input_desc.push(
                 vk::VertexInputBindingDescription2EXT::default()
                     .stride(self.instance_size)
+                    .divisor(1)
                     .input_rate(vk::VertexInputRate::INSTANCE),
             );
-            vertex_buffers.push(self.instance_buffer);
+            vertex_buffers.push(instance_b.handle()); // instance buffer is also in vertex buffers
             vertex_attribute_desc.extend(self.instance_attribute_descriptions.iter());
         }
 
-        if self.mode.contains(DrawMode::INSTANCE_BUFFER)
-            || self.mode.contains(DrawMode::VERTEX_BUFFER)
-        {
-            device.cmd_bind_vertex_buffers(cmd, 0, &vertex_buffers, &[]);
+        if !vertex_buffers.is_empty() {
+            let offsets = vec![0; vertex_buffers.len()];
+            device.cmd_bind_vertex_buffers(cmd, 0, &vertex_buffers, &offsets);
         }
 
         device
             .shader_device
             .cmd_set_vertex_input(cmd, &vertex_input_desc, &vertex_attribute_desc);
 
-        if self.mode.contains(DrawMode::INDEX_BUFFER) {
-            device.cmd_bind_index_buffer(cmd, self.index_buffer, 0, self.index_type);
+        if let Some(index_b) = &self.index_buffer {
+            device.cmd_bind_index_buffer(cmd, index_b.handle(), 0, self.index_type);
             device.cmd_draw_indexed(cmd, self.index_count, self.instance_count.max(1), 0, 0, 0);
         } else {
             device.cmd_draw(cmd, self.vertex_count, self.instance_count.max(1), 0, 0);

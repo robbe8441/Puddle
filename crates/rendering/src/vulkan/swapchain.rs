@@ -1,12 +1,11 @@
-use std::cell::UnsafeCell;
-
-use ash::vk;
-
-use ash::prelude::VkResult;
-
 use super::VulkanDevice;
+use ash::prelude::VkResult;
+use ash::vk;
+use std::cell::UnsafeCell;
+use std::sync::Arc;
 
 pub struct Swapchain {
+    device: Arc<VulkanDevice>,
     pub handle: UnsafeCell<vk::SwapchainKHR>,
     pub loader: ash::khr::swapchain::Device,
     pub image_views: UnsafeCell<Vec<vk::ImageView>>,
@@ -17,7 +16,7 @@ pub struct Swapchain {
 impl Swapchain {
     /// # Safety
     /// # Errors
-    pub unsafe fn new(device: &VulkanDevice, image_extent: [u32; 2]) -> VkResult<Self> {
+    pub unsafe fn new(device: Arc<VulkanDevice>, image_extent: [u32; 2]) -> VkResult<Self> {
         let surface_capabilities = device
             .surface_loader
             .get_physical_device_surface_capabilities(device.pdevice, device.surface)?;
@@ -74,18 +73,19 @@ impl Swapchain {
             .clipped(true)
             .image_array_layers(1);
 
-        let swapchain_loader = ash::khr::swapchain::Device::new(&device.instance, device);
+        let swapchain_loader = ash::khr::swapchain::Device::new(&device.instance, &device);
 
         let swapchain = swapchain_loader.create_swapchain(&swapchain_create_info, None)?;
 
         let image_views = Self::create_swapchain_image_views(
-            device,
+            &device,
             &swapchain_loader,
             swapchain,
             surface_format.format,
         )?;
 
         Ok(Self {
+            device,
             handle: UnsafeCell::new(swapchain),
             loader: swapchain_loader,
             create_info: UnsafeCell::new(swapchain_create_info),
@@ -176,15 +176,17 @@ impl Swapchain {
     pub fn image_format(&self) -> vk::Format {
         unsafe { (*self.create_info.get()).image_format }
     }
+}
 
-    /// # Safety
-    /// there must not currently be written on to one of the swapchain images
-    pub unsafe fn destroy(&self, device: &ash::Device) {
-        for view in &*self.image_views.get() {
-            device.destroy_image_view(*view, None);
+impl Drop for Swapchain {
+    fn drop(&mut self) {
+        unsafe {
+            for view in &*self.image_views.get() {
+                self.device.destroy_image_view(*view, None);
+            }
+
+            let handle = *self.handle.get();
+            self.loader.destroy_swapchain(handle, None);
         }
-
-        let handle = *self.handle.get();
-        self.loader.destroy_swapchain(handle, None);
     }
 }

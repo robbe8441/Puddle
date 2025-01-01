@@ -1,4 +1,5 @@
 struct AssembledVertex {
+  [[vk::location(0)]] float4 position;
   uint index : SV_VertexID;
 };
 
@@ -11,20 +12,14 @@ struct VertexStageOutput {
 VertexStageOutput vs_trig(AssembledVertex assembledVertex) {
   VertexStageOutput output;
 
-  float3 positions[] = {
-    float3(-0.5, 0.5, 1.0),
-    float3(0.0, -0.5, 1.0),
-    float3(0.5, 0.5, 1.0),
-  };
-
   float3 colors[] = {
     float3(1.0, 0.0, 0.0),
     float3(0.0, 1.0, 0.0),
     float3(0.0, 0.0, 1.0),
   };
 
-  output.sv_position = float4(positions[assembledVertex.index], 1.0);
-  output.color = colors[assembledVertex.index];
+  output.sv_position = assembledVertex.position;
+  output.color = colors[assembledVertex.index % 3];
 
   return output;
 }

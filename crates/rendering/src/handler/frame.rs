@@ -1,11 +1,9 @@
+use super::render_context::RenderBatch;
+use crate::vulkan::{Swapchain, VulkanDevice};
 use ash::{
     prelude::VkResult,
     vk::{self, Handle},
 };
-
-use crate::vulkan::{Swapchain, VulkanDevice};
-
-use super::render_context::RenderBatch;
 
 pub struct FrameContext {
     /// tells if the current context is currently executing
