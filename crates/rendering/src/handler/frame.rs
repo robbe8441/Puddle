@@ -1,4 +1,4 @@
-use super::render_context::RenderBatch;
+use super::{bindless::BindlessHandler, render_batch::RenderBatch};
 use crate::vulkan::{Swapchain, VulkanDevice};
 use ash::{
     prelude::VkResult,
@@ -106,6 +106,7 @@ impl FrameContext {
         device: &VulkanDevice,
         swapchain: &Swapchain,
         batches: &[RenderBatch],
+        bindless_handler: &BindlessHandler,
     ) -> VkResult<()> {
         // wait for the commandbuffer to finish executing before resetting it
         device.wait_for_fences(&[self.is_executing_fence], true, u64::MAX)?;
@@ -113,35 +114,47 @@ impl FrameContext {
         let (image_index, _suboptimal) = self.request_image_index(swapchain)?;
 
         // if there is still being rendered to the image, then we need to wait
-        let wait_fence = &mut (*swapchain.image_available_fences.get())[image_index as usize];
+        let wait_fence = &mut (*swapchain.images.get())[image_index as usize].available;
         if !wait_fence.is_null() {
             device.wait_for_fences(&[*wait_fence], true, u64::MAX)?;
         }
         *wait_fence = self.is_executing_fence;
+
         device.reset_fences(&[self.is_executing_fence])?;
 
         device.reset_command_buffer(self.command_buffer, vk::CommandBufferResetFlags::empty())?;
 
-        self.draw(device, swapchain, image_index, batches)?;
+        self.record_command_buffer(device, swapchain, image_index, batches, bindless_handler)?;
 
         self.submit(device, swapchain, image_index)?;
         Ok(())
     }
 
-    unsafe fn draw(
+    unsafe fn record_command_buffer(
         &self,
         device: &VulkanDevice,
         swapchain: &Swapchain,
         image_index: u32,
         batches: &[RenderBatch],
+        bindless_handler: &BindlessHandler,
     ) -> VkResult<()> {
         let command_buffer = self.command_buffer;
-        let swapchain_views = &*swapchain.image_views.get();
+        let swapchain_views = &*swapchain.images.get();
         let swapchain_images = &*swapchain
             .loader
             .get_swapchain_images(*swapchain.handle.get())?;
 
         device.begin_command_buffer(self.command_buffer, &vk::CommandBufferBeginInfo::default())?;
+
+        // bind bindless descriptor set
+        device.cmd_bind_descriptor_sets(
+            self.command_buffer,
+            vk::PipelineBindPoint::GRAPHICS,
+            bindless_handler.pipeline_layout,
+            0,
+            &[bindless_handler.descriptor_set],
+            &[],
+        );
 
         let clear_value = vk::ClearValue {
             color: vk::ClearColorValue {
@@ -149,6 +162,7 @@ impl FrameContext {
             },
         };
 
+        // convert the swapchain image in to the right format to be written on
         let barrier = vk::ImageMemoryBarrier::default()
             .src_access_mask(vk::AccessFlags::empty())
             .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)
@@ -163,14 +177,6 @@ impl FrameContext {
                 layer_count: 1,
             });
 
-        let present_barrier = vk::ImageMemoryBarrier {
-            src_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
-            dst_access_mask: vk::AccessFlags::empty(),
-            old_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
-            new_layout: vk::ImageLayout::PRESENT_SRC_KHR,
-            ..barrier
-        };
-
         device.cmd_pipeline_barrier(
             self.command_buffer,
             vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT,
@@ -181,35 +187,54 @@ impl FrameContext {
             &[barrier],
         );
 
-        let clear_attachments = [vk::RenderingAttachmentInfo::default()
-            .load_op(vk::AttachmentLoadOp::CLEAR)
-            .store_op(vk::AttachmentStoreOp::STORE)
-            .clear_value(clear_value)
-            .image_view(swapchain_views[image_index as usize])
-            .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)];
+        let clear_attachments = [
+            vk::RenderingAttachmentInfo::default()
+                .load_op(vk::AttachmentLoadOp::CLEAR)
+                .store_op(vk::AttachmentStoreOp::STORE)
+                .clear_value(clear_value)
+                .image_view(swapchain_views[image_index as usize].main_view)
+                .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
+            vk::RenderingAttachmentInfo::default()
+                .load_op(vk::AttachmentLoadOp::CLEAR)
+                .store_op(vk::AttachmentStoreOp::STORE)
+                .clear_value(clear_value)
+                .image_view(swapchain_views[image_index as usize].depth_view)
+                .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
+        ];
 
-        let render_attachments = [vk::RenderingAttachmentInfo::default()
-            .load_op(vk::AttachmentLoadOp::LOAD)
-            .store_op(vk::AttachmentStoreOp::STORE)
-            .clear_value(clear_value)
-            .image_view(swapchain_views[image_index as usize])
-            .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL)];
+        let render_attachments = [
+            vk::RenderingAttachmentInfo::default()
+                .load_op(vk::AttachmentLoadOp::LOAD)
+                .store_op(vk::AttachmentStoreOp::STORE)
+                .image_view(clear_attachments[0].image_view)
+                .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
+            vk::RenderingAttachmentInfo::default()
+                .load_op(vk::AttachmentLoadOp::LOAD)
+                .store_op(vk::AttachmentStoreOp::STORE)
+                .image_view(clear_attachments[1].image_view)
+                .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
+        ];
 
         let image_size = (*swapchain.create_info.get()).image_extent;
         let render_area = vk::Rect2D::default().extent(image_size);
 
-        let render_begin = vk::RenderingInfo::default()
-            .render_area(render_area)
-            .layer_count(1)
-            .view_mask(0)
-            .color_attachments(&clear_attachments);
+        // the first draw clears the attachments
+        if let Some(batch) = batches.first() {
+            batch.execute(device, command_buffer, &clear_attachments, render_area);
+        }
 
-        device.cmd_begin_rendering(command_buffer, &render_begin);
-        device.cmd_end_rendering(command_buffer);
-
-        for batch in batches {
+        for batch in batches.iter().skip(1) {
             batch.execute(device, command_buffer, &render_attachments, render_area);
         }
+
+        // convert the swapchain image back to a presentable format
+        let present_barrier = vk::ImageMemoryBarrier {
+            src_access_mask: vk::AccessFlags::COLOR_ATTACHMENT_WRITE,
+            dst_access_mask: vk::AccessFlags::empty(),
+            old_layout: vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL,
+            new_layout: vk::ImageLayout::PRESENT_SRC_KHR,
+            ..barrier
+        };
 
         device.cmd_pipeline_barrier(
             self.command_buffer,

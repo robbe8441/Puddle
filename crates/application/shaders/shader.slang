@@ -1,3 +1,4 @@
+
 struct AssembledVertex {
   [[vk::location(0)]]
   float4 position;

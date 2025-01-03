@@ -9,13 +9,13 @@ use std::sync::Arc;
 #[derive(Default)]
 pub struct DrawData {
     /// must be set if mode contains ``VERTEX_BUFFER``
-    pub vertex_buffer: Option<Buffer>,
+    pub vertex_buffer: Option<Arc<Buffer>>,
     /// must be set if mode contains ``INDEX_BUFFER``
-    pub index_buffer: Option<Buffer>,
+    pub index_buffer: Option<Arc<Buffer>>,
     /// must be set if mode contains ``INDEX_BUFFER``
     pub index_type: vk::IndexType,
     /// must be set if mode contains ``INSTANCE_BUFFER``
-    pub instance_buffer: Option<Buffer>,
+    pub instance_buffer: Option<Arc<Buffer>>,
     /// defaults to 1 (cant be 0)
     pub instance_count: u32,
     /// must be set if mode contains ``INDEX_BUFFER``

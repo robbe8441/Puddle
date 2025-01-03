@@ -1,0 +1,10 @@
+[package]
+name = "application"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+rendering.path = "../rendering/"
+math.path = "../math/"
+glfw = { version = "0.59.0", features = ["wayland"] }
+ash = "0.38.0"

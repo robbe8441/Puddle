@@ -1,12 +1,16 @@
+use std::sync::Arc;
+
 use ash::{prelude::VkResult, vk};
 
-use crate::vulkan::VulkanDevice;
+use crate::vulkan::{Buffer, VulkanDevice};
 
+#[derive(Debug)]
 pub struct BindlessResourceHandle {
     binding: usize,
     ty: BindlessResourceType,
 }
 
+#[derive(Debug)]
 pub enum BindlessResourceType {
     UniformBuffer,
     StorageBuffer,
@@ -15,10 +19,11 @@ pub enum BindlessResourceType {
 
 pub struct BindlessHandler {
     descriptor_pool: vk::DescriptorPool,
-    descriptor_layout: vk::DescriptorSetLayout,
-    descriptor_set: vk::DescriptorSet,
-    uniform_buffers: Vec<vk::Buffer>,
-    storage_buffers: Vec<vk::Buffer>,
+    pub descriptor_layout: vk::DescriptorSetLayout,
+    pub(crate) descriptor_set: vk::DescriptorSet,
+    pub(crate) pipeline_layout: vk::PipelineLayout,
+    uniform_buffers: Vec<Arc<Buffer>>,
+    storage_buffers: Vec<Arc<Buffer>>,
     storage_images: Vec<vk::ImageView>,
 }
 
@@ -74,10 +79,17 @@ impl BindlessHandler {
 
         let set = unsafe { device.allocate_descriptor_sets(&set_allocate_info) }?[0];
 
+        let pipeline_layout_info = vk::PipelineLayoutCreateInfo::default().set_layouts(&layouts);
+        // TODO: .push_constant_ranges(push_constant_ranges);
+
+        let pipeline_layout =
+            unsafe { device.create_pipeline_layout(&pipeline_layout_info, None) }?;
+
         Ok(Self {
             descriptor_pool: pool,
             descriptor_layout: layout,
             descriptor_set: set,
+            pipeline_layout,
             uniform_buffers: vec![],
             storage_images: vec![],
             storage_buffers: vec![],
@@ -138,22 +150,22 @@ impl BindlessHandler {
     pub fn set_uniform_buffer(
         &mut self,
         device: &VulkanDevice,
-        buffer: vk::Buffer,
+        buffer: Arc<Buffer>,
     ) -> BindlessResourceHandle {
-        let binding = self.uniform_buffers.len();
+        let arr_index = self.uniform_buffers.len();
 
         self.upload_buffer(
             device,
-            buffer,
+            buffer.handle(),
             vk::DescriptorType::UNIFORM_BUFFER,
-            binding as u32,
             Self::UNIFORM_BUFFER_BINDING,
+            arr_index as u32,
         );
 
         self.uniform_buffers.push(buffer);
 
         BindlessResourceHandle {
-            binding,
+            binding: arr_index,
             ty: BindlessResourceType::UniformBuffer,
         }
     }
@@ -161,22 +173,22 @@ impl BindlessHandler {
     pub fn set_storage_buffer(
         &mut self,
         device: &VulkanDevice,
-        buffer: vk::Buffer,
+        buffer: Arc<Buffer>,
     ) -> BindlessResourceHandle {
-        let binding = self.storage_buffers.len();
+        let arr_index = self.storage_buffers.len();
 
         self.upload_buffer(
             device,
-            buffer,
+            buffer.handle(),
             vk::DescriptorType::STORAGE_BUFFER,
-            binding as u32,
             Self::STORAGE_BUFFER_BINDING,
+            arr_index as u32,
         );
 
         self.storage_buffers.push(buffer);
 
         BindlessResourceHandle {
-            binding,
+            binding: arr_index,
             ty: BindlessResourceType::StorageBuffer,
         }
     }
@@ -187,22 +199,22 @@ impl BindlessHandler {
         image_view: vk::ImageView,
         image_layout: vk::ImageLayout,
     ) -> BindlessResourceHandle {
-        let binding = self.storage_images.len();
+        let arr_index = self.storage_images.len();
 
         self.upload_image(
             device,
             image_view,
             image_layout,
             vk::Sampler::null(),
-            vk::DescriptorType::STORAGE_BUFFER,
-            binding as u32,
-            Self::STORAGE_BUFFER_BINDING,
+            vk::DescriptorType::STORAGE_IMAGE,
+            Self::STORAGE_IMAGE_BINDING,
+            arr_index as u32,
         );
 
         self.storage_images.push(image_view);
 
         BindlessResourceHandle {
-            binding,
+            binding: arr_index,
             ty: BindlessResourceType::StorageImage,
         }
     }
@@ -210,5 +222,6 @@ impl BindlessHandler {
     pub unsafe fn destroy(&self, device: &VulkanDevice) {
         device.destroy_descriptor_pool(self.descriptor_pool, None);
         device.destroy_descriptor_set_layout(self.descriptor_layout, None);
+        device.destroy_pipeline_layout(self.pipeline_layout, None);
     }
 }

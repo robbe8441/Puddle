@@ -237,11 +237,18 @@ unsafe fn create_device(
     let mut shader_object_features =
         vk::PhysicalDeviceShaderObjectFeaturesEXT::default().shader_object(true);
 
+    let mut vk12_features = vk::PhysicalDeviceVulkan12Features::default()
+        .runtime_descriptor_array(true)
+        .descriptor_indexing(true)
+        .descriptor_binding_partially_bound(true)
+        .descriptor_binding_variable_descriptor_count(true);
+
     let device_create_info = vk::DeviceCreateInfo::default()
         .queue_create_infos(&queue_infos)
         .enabled_extension_names(&device_extensions)
         .push_next(&mut dynamic_rendering_features)
-        .push_next(&mut shader_object_features);
+        .push_next(&mut shader_object_features)
+        .push_next(&mut vk12_features);
 
     let device = instance.create_device(pdevice, &device_create_info, None)?;
 

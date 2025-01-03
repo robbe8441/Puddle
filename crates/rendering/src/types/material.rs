@@ -40,7 +40,10 @@ pub trait Material {
         false
     }
     fn set_color_blend_enable(&self) -> (u32, &[u32]) {
-        (0, &[0])
+        (0, &[0, 0])
+    }
+    fn set_front_face(&self) -> vk::FrontFace {
+        vk::FrontFace::COUNTER_CLOCKWISE
     }
 
     fn set_color_blend_equation(&self) -> (u32, &[vk::ColorBlendEquationEXT]) {
@@ -57,7 +60,10 @@ pub trait Material {
         )
     }
     fn set_color_write_mask(&self) -> (u32, &[vk::ColorComponentFlags]) {
-        (0, &[vk::ColorComponentFlags::RGBA])
+        (
+            0,
+            &[vk::ColorComponentFlags::RGBA, vk::ColorComponentFlags::R],
+        )
     }
 
     /// # Safety
@@ -70,6 +76,7 @@ pub trait Material {
         s_device.cmd_set_polygon_mode(cmd, self.set_polygon_mode());
         s_device.cmd_set_rasterization_samples(cmd, self.set_rasterization_samples());
         s_device.cmd_set_alpha_to_coverage_enable(cmd, self.set_alpha_to_coverage_enable());
+        s_device.cmd_set_front_face(cmd, self.set_front_face());
         s_device.cmd_set_cull_mode(cmd, self.set_cull_mode());
         s_device.cmd_set_depth_test_enable(cmd, self.set_depth_test_enable());
         s_device.cmd_set_depth_write_enable(cmd, self.set_depth_write_enable());
