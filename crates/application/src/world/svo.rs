@@ -13,7 +13,7 @@ use std::{
     sync::Arc,
 };
 
-use math::{vec3, Vec3};
+use math::{dvec3, DVec3};
 
 /// |  64 bit   |    8 bit      |    24 bit   |
 ///    colors      valid mask      child ptr
@@ -95,15 +95,15 @@ pub struct OctreeNode {
 }
 
 impl OctreeNode {
-    pub const NODE_POS: [Vec3; 8] = [
-        vec3(-0.5, -0.5, -0.5),
-        vec3(0.5, -0.5, -0.5),
-        vec3(-0.5, 0.5, -0.5),
-        vec3(0.5, 0.5, -0.5),
-        vec3(-0.5, -0.5, 0.5),
-        vec3(0.5, -0.5, 0.5),
-        vec3(-0.5, 0.5, 0.5),
-        vec3(0.5, 0.5, 0.5),
+    pub const NODE_POS: [DVec3; 8] = [
+        dvec3(-0.5, -0.5, -0.5),
+        dvec3(0.5, -0.5, -0.5),
+        dvec3(-0.5, 0.5, -0.5),
+        dvec3(0.5, 0.5, -0.5),
+        dvec3(-0.5, -0.5, 0.5),
+        dvec3(0.5, -0.5, 0.5),
+        dvec3(-0.5, 0.5, 0.5),
+        dvec3(0.5, 0.5, 0.5),
     ];
 
     /// get the valid mask of the node
@@ -119,16 +119,16 @@ impl OctreeNode {
     /// write once to the octree
     /// position must contain values between 0 and 1
     /// ``total_layers`` is how deep it should go in to the tree
-    pub fn write(&mut self, pos: Vec3, color: u8, layer: usize) {
+    pub fn write(&mut self, pos: DVec3, color: u8, layer: usize) {
         let mut node: &mut OctreeNode = self;
-        let mut center = Vec3::ONE * 0.5;
+        let mut center = DVec3::ONE * 0.5;
 
         for current_layer in 1..layer {
             let index: u8 = (pos.x > center.x) as u8
                 | ((pos.y > center.y) as u8) << 1
                 | ((pos.z > center.z) as u8) << 2;
 
-            center += Self::NODE_POS[index as usize] * (0.5 / current_layer as f32);
+            center += Self::NODE_POS[index as usize] * (0.5 / current_layer as f64);
 
             node.colors.set_color(index, color);
 
@@ -154,9 +154,9 @@ impl OctreeNode {
     /// ``total_layers`` is how deep it should go in to the tree, doesn't need to be the same when
     /// writing to the tree, this can be used for LOD's
     #[must_use]
-    pub fn sample(&self, pos: Vec3, max_layers: usize) -> u8 {
+    pub fn sample(&self, pos: DVec3, max_layers: usize) -> u8 {
         let mut node: &OctreeNode = self;
-        let mut center = Vec3::ONE * 0.5;
+        let mut center = DVec3::ONE * 0.5;
 
         for current_layer in 1..max_layers {
             let index: u8 = (pos.x > center.x) as u8
@@ -165,7 +165,7 @@ impl OctreeNode {
 
             let next_node = node.children[index as usize];
             if let Some(next_node) = next_node {
-                center += Self::NODE_POS[index as usize] * (0.5 / current_layer as f32);
+                center += Self::NODE_POS[index as usize] * (0.5 / current_layer as f64);
                 node = unsafe { next_node.as_ref() };
             } else {
                 break;
@@ -312,9 +312,8 @@ impl Debug for OctreeNode {
 
 #[cfg(test)]
 mod tests {
-    use math::vec3;
-
     use super::{FlatOctree, FlatOctreeNode, OctreeNode};
+    use glam::dvec3;
 
     #[test]
     fn valid_mask() {
@@ -346,8 +345,8 @@ mod tests {
         let mut node = OctreeNode::default();
 
         for x in 0..10 {
-            let y = (x as f32 / 3.0).sin() / 2.0;
-            node.write(vec3(x as f32 / 10.0, y, 0.0), x, 10);
+            let y = (x as f64 / 3.0).sin() / 2.0;
+            node.write(dvec3(x as f64 / 10.0, y, 0.0), x, 10);
         }
 
         let flat1 = node.flatten();
@@ -362,8 +361,8 @@ mod tests {
         let mut node = OctreeNode::default();
 
         for x in 0..10 {
-            let y = (x as f32 / 3.0).sin() / 2.0;
-            node.write(vec3(x as f32 / 10.0, y, 0.0), x, 10);
+            let y = (x as f64 / 3.0).sin() / 2.0;
+            node.write(dvec3(x as f64 / 10.0, y, 0.0), x, 10);
         }
 
         let flat1 = node.flatten();
@@ -374,9 +373,10 @@ mod tests {
         let node = flat2.unflatten();
 
         for x in 0..10 {
-            let y = (x as f32 / 3.0).sin() / 2.0;
-            let v = node.sample(vec3(x as f32 / 10.0, y, 0.0), 10);
+            let y = (x as f64 / 3.0).sin() / 2.0;
+            let v = node.sample(dvec3(x as f64 / 10.0, y, 0.0), 10);
             assert_eq!(v, x);
         }
     }
 }
+

@@ -156,9 +156,14 @@ impl FrameContext {
             &[],
         );
 
-        let clear_value = vk::ClearValue {
+        let color_clear_value = vk::ClearValue {
             color: vk::ClearColorValue {
                 float32: [0.05, 0.01, 0.07, 1.0],
+            },
+        };
+        let clear_value = vk::ClearValue {
+            color: vk::ClearColorValue {
+                float32: [0.0, 0.0, 0.0, 0.0],
             },
         };
 
@@ -191,8 +196,14 @@ impl FrameContext {
             vk::RenderingAttachmentInfo::default()
                 .load_op(vk::AttachmentLoadOp::CLEAR)
                 .store_op(vk::AttachmentStoreOp::STORE)
-                .clear_value(clear_value)
+                .clear_value(color_clear_value)
                 .image_view(swapchain_views[image_index as usize].main_view)
+                .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
+            vk::RenderingAttachmentInfo::default()
+                .load_op(vk::AttachmentLoadOp::CLEAR)
+                .store_op(vk::AttachmentStoreOp::STORE)
+                .clear_value(clear_value)
+                .image_view(swapchain_views[image_index as usize].normal_view)
                 .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
             vk::RenderingAttachmentInfo::default()
                 .load_op(vk::AttachmentLoadOp::CLEAR)
@@ -202,18 +213,10 @@ impl FrameContext {
                 .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
         ];
 
-        let render_attachments = [
-            vk::RenderingAttachmentInfo::default()
-                .load_op(vk::AttachmentLoadOp::LOAD)
-                .store_op(vk::AttachmentStoreOp::STORE)
-                .image_view(clear_attachments[0].image_view)
-                .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
-            vk::RenderingAttachmentInfo::default()
-                .load_op(vk::AttachmentLoadOp::LOAD)
-                .store_op(vk::AttachmentStoreOp::STORE)
-                .image_view(clear_attachments[1].image_view)
-                .image_layout(vk::ImageLayout::COLOR_ATTACHMENT_OPTIMAL),
-        ];
+        let render_attachments: Vec<_> = clear_attachments
+            .iter()
+            .map(|v| v.load_op(vk::AttachmentLoadOp::LOAD))
+            .collect();
 
         let image_size = (*swapchain.create_info.get()).image_extent;
         let render_area = vk::Rect2D::default().extent(image_size);

@@ -1,10 +1,10 @@
 use ash::vk;
 use material::DefaultMaterial;
-use svo::OctreeNode;
 use std::{sync::Arc, time::Instant};
+use svo::OctreeNode;
 
 use camera::Camera;
-use math::{Mat4, Transform};
+use math::{vec4, Mat4, Transform, Vec4};
 use rendering::{
     handler::{
         render_batch::{DrawData, RenderBatch},
@@ -18,11 +18,12 @@ mod camera;
 mod material;
 pub mod svo;
 
-
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub struct UniformData {
     view_proj: Mat4,
+    cam_pos: Vec4,
+    time: f32,
 }
 
 pub struct World {
@@ -112,10 +113,14 @@ impl World {
     }
 
     pub fn update(&self) {
+        let cam_pos = self.camera.transform.translation;
+
         self.uniform_buffer.write(
             0,
             &[UniformData {
                 view_proj: self.camera.build_proj(),
+                cam_pos: vec4(cam_pos.x, cam_pos.y, cam_pos.z, 1.0),
+                time: self.start_time.elapsed().as_secs_f32(),
             }],
         );
     }

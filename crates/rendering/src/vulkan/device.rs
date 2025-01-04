@@ -243,9 +243,12 @@ unsafe fn create_device(
         .descriptor_binding_partially_bound(true)
         .descriptor_binding_variable_descriptor_count(true);
 
+    let device_features = vk::PhysicalDeviceFeatures::default().shader_int64(true);
+
     let device_create_info = vk::DeviceCreateInfo::default()
         .queue_create_infos(&queue_infos)
         .enabled_extension_names(&device_extensions)
+        .enabled_features(&device_features)
         .push_next(&mut dynamic_rendering_features)
         .push_next(&mut shader_object_features)
         .push_next(&mut vk12_features);

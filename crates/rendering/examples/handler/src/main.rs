@@ -54,17 +54,6 @@ impl Material for DefaultMaterial {
             &[vk::ShaderStageFlags::VERTEX, vk::ShaderStageFlags::FRAGMENT],
         )
     }
-
-    fn set_polygon_mode(&self) -> vk::PolygonMode {
-        vk::PolygonMode::FILL
-    }
-
-    fn set_color_write_mask(&self) -> (u32, &[vk::ColorComponentFlags]) {
-        (
-            0,
-            &[vk::ColorComponentFlags::RGBA, vk::ColorComponentFlags::R],
-        )
-    }
 }
 
 #[allow(clippy::too_many_lines)]
@@ -190,14 +179,5 @@ fn main() {
         }
     }
 
-    unsafe {
-        handler
-            .device
-            .shader_device
-            .destroy_shader(material.shaders[0], None);
-        handler
-            .device
-            .shader_device
-            .destroy_shader(material.shaders[1], None);
-    }
+    unsafe { handler.destroy() };
 }

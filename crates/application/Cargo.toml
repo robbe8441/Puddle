@@ -8,3 +8,6 @@ rendering.path = "../rendering/"
 math.path = "../math/"
 glfw = { version = "0.59.0", features = ["wayland"] }
 ash = "0.38.0"
+
+[dev-dependencies]
+rand = "0.8.5"

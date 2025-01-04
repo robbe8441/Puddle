@@ -7,17 +7,27 @@ use std::sync::Arc;
 pub struct SwapchainImage {
     pub main_image: vk::Image, // does not need to be destroyed manually
     pub main_view: vk::ImageView,
+
     pub depth_image: vk::Image,
     pub depth_memory: MemoryBlock,
     pub depth_view: vk::ImageView,
+
+    pub normal_image: vk::Image,
+    pub normal_memory: MemoryBlock,
+    pub normal_view: vk::ImageView,
+
     pub available: vk::Fence, // also does not need to be destroyed
 }
 
 impl SwapchainImage {
-    pub unsafe fn destroy(&self, device: &VulkanDevice) {
+    unsafe fn destroy(&self, device: &VulkanDevice) {
         device.destroy_image_view(self.main_view, None);
+
         device.destroy_image_view(self.depth_view, None);
         device.destroy_image(self.depth_image, None);
+
+        device.destroy_image_view(self.normal_view, None);
+        device.destroy_image(self.normal_image, None);
     }
 }
 
@@ -144,49 +154,11 @@ impl Swapchain {
 
                 let main_view = device.create_image_view(&info, None).unwrap();
 
-                let depth_format = vk::Format::R32_SFLOAT;
-                let depth_image_info = vk::ImageCreateInfo::default()
-                    .image_type(vk::ImageType::TYPE_2D)
-                    .format(depth_format)
-                    .extent(vk::Extent3D {
-                        width: image_extent[0],
-                        height: image_extent[1],
-                        depth: 1,
-                    })
-                    .mip_levels(1)
-                    .array_layers(1)
-                    .samples(vk::SampleCountFlags::TYPE_1)
-                    .tiling(vk::ImageTiling::OPTIMAL)
-                    .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT);
+                let (depth_memory, depth_image, depth_view) =
+                    create_texture(&device, image_extent, vk::Format::R32_SFLOAT).unwrap();
 
-                let depth_image = device.create_image(&depth_image_info, None).unwrap();
-
-                let memory_requirements = device.get_image_memory_requirements(depth_image);
-                let depth_memory = MemoryBlock::new(
-                    device.clone(),
-                    memory_requirements,
-                    vk::MemoryPropertyFlags::DEVICE_LOCAL,
-                )
-                .unwrap();
-
-                device
-                    .bind_image_memory(depth_image, depth_memory.handle(), 0)
-                    .unwrap();
-
-                let subresource = vk::ImageSubresourceRange::default()
-                    .aspect_mask(vk::ImageAspectFlags::COLOR)
-                    .base_mip_level(0)
-                    .level_count(1)
-                    .base_array_layer(0)
-                    .layer_count(1);
-
-                let depth_view_info = vk::ImageViewCreateInfo::default()
-                    .image(depth_image)
-                    .view_type(vk::ImageViewType::TYPE_2D)
-                    .format(depth_format)
-                    .subresource_range(subresource);
-
-                let depth_view = device.create_image_view(&depth_view_info, None).unwrap();
+                let (normal_memory, normal_image, normal_view) =
+                    create_texture(&device, image_extent, vk::Format::R32G32B32A32_SFLOAT).unwrap();
 
                 SwapchainImage {
                     main_image,
@@ -194,6 +166,9 @@ impl Swapchain {
                     depth_image,
                     depth_memory,
                     depth_view,
+                    normal_image,
+                    normal_memory,
+                    normal_view,
                     available: vk::Fence::null(),
                 }
             })
@@ -259,36 +234,50 @@ impl Drop for Swapchain {
     }
 }
 
-unsafe fn get_supported_format(
-    device: &VulkanDevice,
-    candidates: &[vk::Format],
-    tiling: vk::ImageTiling,
-    features: vk::FormatFeatureFlags,
-) -> Option<vk::Format> {
-    candidates.iter().copied().find(|f| {
-        let properties = device
-            .instance
-            .get_physical_device_format_properties(device.pdevice, *f);
+unsafe fn create_texture(
+    device: &Arc<VulkanDevice>,
+    image_extent: [u32; 2],
+    format: vk::Format,
+) -> VkResult<(MemoryBlock, vk::Image, vk::ImageView)> {
+    let image_info = vk::ImageCreateInfo::default()
+        .image_type(vk::ImageType::TYPE_2D)
+        .format(format)
+        .extent(vk::Extent3D {
+            width: image_extent[0],
+            height: image_extent[1],
+            depth: 1,
+        })
+        .mip_levels(1)
+        .array_layers(1)
+        .samples(vk::SampleCountFlags::TYPE_1)
+        .tiling(vk::ImageTiling::OPTIMAL)
+        .usage(vk::ImageUsageFlags::COLOR_ATTACHMENT);
 
-        match tiling {
-            vk::ImageTiling::LINEAR => properties.linear_tiling_features.contains(features),
-            vk::ImageTiling::OPTIMAL => properties.optimal_tiling_features.contains(features),
-            _ => false,
-        }
-    })
-}
+    let image = device.create_image(&image_info, None)?;
 
-unsafe fn get_depth_format(device: &VulkanDevice) -> Option<vk::Format> {
-    let candidates = &[
-        vk::Format::D32_SFLOAT,
-        vk::Format::D32_SFLOAT_S8_UINT,
-        vk::Format::D24_UNORM_S8_UINT,
-    ];
+    let memory_requirements = device.get_image_memory_requirements(image);
+    let memory = MemoryBlock::new(
+        device.clone(),
+        memory_requirements,
+        vk::MemoryPropertyFlags::DEVICE_LOCAL,
+    )?;
 
-    get_supported_format(
-        device,
-        candidates,
-        vk::ImageTiling::OPTIMAL,
-        vk::FormatFeatureFlags::DEPTH_STENCIL_ATTACHMENT,
-    )
+    device.bind_image_memory(image, memory.handle(), 0)?;
+
+    let subresource = vk::ImageSubresourceRange::default()
+        .aspect_mask(vk::ImageAspectFlags::COLOR)
+        .base_mip_level(0)
+        .level_count(1)
+        .base_array_layer(0)
+        .layer_count(1);
+
+    let view_info = vk::ImageViewCreateInfo::default()
+        .image(image)
+        .view_type(vk::ImageViewType::TYPE_2D)
+        .format(format)
+        .subresource_range(subresource);
+
+    let view = device.create_image_view(&view_info, None)?;
+
+    Ok((memory, image, view))
 }

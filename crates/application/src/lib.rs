@@ -11,14 +11,17 @@ pub mod world;
 type TaskFn = dyn Fn(&mut World);
 
 pub struct Application {
-    pub window: AppWindow,
-    pub renderer: RenderHandler,
-    pub world: World,
     pub tasks: Vec<Box<TaskFn>>,
+    pub world: World,
+    pub renderer: RenderHandler,
+    /// window should be dropped last as it invalidates the surface and so the swapchain
+    pub window: AppWindow,
 }
 
 impl Application {
     /// # Errors
+    /// if your gpu isn't supported by the renderer
+    /// or something else causes vulkan to error (for example ``OutOfMemory``)
     pub fn new() -> VkResult<Self> {
         let window = AppWindow::new();
 
@@ -68,4 +71,8 @@ impl Application {
             }
         }
     }
+}
+
+impl Drop for AppWindow {
+    fn drop(&mut self) {}
 }

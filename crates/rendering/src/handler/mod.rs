@@ -130,17 +130,22 @@ impl RenderHandler {
     pub fn get_swapchain_resolution(&self) -> vk::Extent2D {
         unsafe { (*self.swapchain.create_info.get()).image_extent }
     }
+
+    /// # Safety
+    /// invalidates all shaders, descriptor sets and frame-handers
+    /// the device still stays valid
+    pub unsafe fn destroy(&self) {}
 }
 
 impl Drop for RenderHandler {
     fn drop(&mut self) {
         unsafe {
             let _ = self.device.device_wait_idle();
-            for shader in &self.loaded_shaders {
-                self.device.shader_device.destroy_shader(*shader, None);
-            }
             for frame in &self.frames {
                 frame.destroy(&self.device);
+            }
+            for shader in &self.loaded_shaders {
+                self.device.shader_device.destroy_shader(*shader, None);
             }
             self.bindless_handler.destroy(&self.device);
         }

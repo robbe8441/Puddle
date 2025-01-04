@@ -40,7 +40,7 @@ pub trait Material {
         false
     }
     fn set_color_blend_enable(&self) -> (u32, &[u32]) {
-        (0, &[0, 0])
+        (0, &[0, 0, 0])
     }
     fn set_front_face(&self) -> vk::FrontFace {
         vk::FrontFace::COUNTER_CLOCKWISE
@@ -62,7 +62,11 @@ pub trait Material {
     fn set_color_write_mask(&self) -> (u32, &[vk::ColorComponentFlags]) {
         (
             0,
-            &[vk::ColorComponentFlags::RGBA, vk::ColorComponentFlags::R],
+            &[
+                vk::ColorComponentFlags::RGBA,
+                vk::ColorComponentFlags::R,
+                vk::ColorComponentFlags::RGBA,
+            ],
         )
     }
 
