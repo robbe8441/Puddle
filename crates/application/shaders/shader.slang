@@ -50,15 +50,23 @@ FragmentOutput fs_main(VertexStageOutput input) {
 
   var hit : Hit;
   let ray_dir = normalize(input.vertex_pos - uniform.cam_pos.xyz);
-  let ray = Ray(uniform.cam_pos.xyz, ray_dir, 1.0f / ray_dir);
+  let ray = Ray(uniform.cam_pos.xyz * 100.0, ray_dir, 1.0f / ray_dir);
 
   let color_index = trace_ray(0, ray, hit);
 
-  FragmentOutput output;
-  output.color = float4(float3(color_index / 255.0), 1.0);
+  FragmentOutput output = {};
+  // if (color_index != 0) {
+        // let sur_dir = normalize(float3(0.4, 0.6, 0.3));
+        // let sun_light = dot(sur_dir, hit.n) / 2.0 + 0.6;
+
+        let color = (float)color_index / 255.0;
+      output.color = float4(float3(color), 1.0);
+  // } else {
+  //     output.color = float4(0.0);
+  // }
+
   output.normal = 1.0 - output.color;
   output.depth = 1.0 - output.color.r;
-
   return output;
 }
 

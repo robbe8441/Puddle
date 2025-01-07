@@ -1,39 +1,53 @@
+use std::error::Error;
+
 use application::{
     world::{svo::OctreeNode, World},
     Application,
 };
 use ash::vk;
 use math::dvec3;
-use math::{vec3, Transform, Vec3};
+use math::{Transform, Vec3};
+use rand::{thread_rng, Rng};
 use rendering::vulkan::Buffer;
-use std::error::Error;
 
 fn update_camera(world: &mut World) {
-    let t = 1.0f32;
+    let t = world.start_time.elapsed().as_secs_f32() / 5.0;
 
     world.camera.transform =
-        Transform::from_xyz(t.cos() * 2.0, 1.0, t.sin() * 2.0).looking_at(Vec3::ZERO, Vec3::Y);
+        Transform::from_xyz(t.cos() * 1.2, 0.2, t.sin() * 1.2).looking_at(Vec3::ZERO, Vec3::Y);
 }
 
 fn create_octree(app: &mut Application) {
-    let mut octree = OctreeNode::default();
-
-    octree.write(dvec3(0.0, 0.0, 0.0), 255, 7);
-    let flatten = octree.flatten();
-    dbg!(&flatten);
-    let bytes = flatten.as_bytes();
-
     let voxel_buffer = Buffer::new(
         app.renderer.device.clone(),
-        bytes.len() as u64,
+        8 * 1024 * 100,
         vk::BufferUsageFlags::STORAGE_BUFFER,
         vk::MemoryPropertyFlags::HOST_VISIBLE,
     )
     .unwrap();
 
-    voxel_buffer.write(0, bytes);
+    let handle = app.renderer.set_storage_buffer(voxel_buffer.clone(), 0);
+    assert!(handle.binding == 0);
 
-    let _handle = app.renderer.set_storage_buffer(voxel_buffer.clone());
+    let mut octree = OctreeNode::default();
+    octree.write(dvec3(1.0, 1.0, 1.0), 255, 1);
+    octree.write(dvec3(1.0, 1.0, -1.0), 255, 1);
+    octree.write(dvec3(1.0, -1.0, 1.0), 255, 1);
+    octree.write(dvec3(1.0, -1.0, -1.0), 255, 1);
+    octree.write(dvec3(-1.0, 1.0, 1.0), 255, 1);
+    octree.write(dvec3(-1.0, 1.0, -1.0), 255, 1);
+    octree.write(dvec3(-1.0, -1.0, 1.0), 255, 1);
+    octree.write(dvec3(-1.0, -1.0, -1.0), 255, 1);
+
+    octree.write(dvec3(-1.0, -1.0, -1.0), 60, 3);
+    octree.write(dvec3(-1.0, -1.0, -1.0), 255, 4);
+
+    // octree.write(dvec3(-1.0, -1.0, -1.0), 255, 3);
+
+    let flatten = octree.flatten();
+    let bytes = flatten.as_bytes();
+
+    voxel_buffer.write(0, bytes);
 
     app.world.voxel_octrees.push(octree);
     app.world.voxel_buffers.push(voxel_buffer);
@@ -41,30 +55,52 @@ fn create_octree(app: &mut Application) {
 
 fn write_octree(world: &mut World) {
     let buffer = &world.voxel_buffers[0];
-    let t = world.start_time.elapsed().as_secs_f64() / 10.0;
+    let octree = &mut world.voxel_octrees[0];
+    let t = world.start_time.elapsed().as_secs_f64() * 10.0;
 
-    let mut octree = OctreeNode::default();
-    octree.write(
-        dvec3(
-            t.sin() / 2.0 + 0.5,
-            0.0,
-            t.cos() / 2.0 + 0.5,
-        ),
-        255,
-        7,
-    );
+    let mut rng = thread_rng();
+    let x_pos = rng.gen_range(-1.0..1.0);
+    let y_pos = rng.gen_range(-1.0..1.0);
+    let z_pos = rng.gen_range(-1.0..1.0);
+    // let color = (t / 10.0).cos() / 2.0 + 0.5;
+    let color = if rng.gen_bool(0.0001) { 50 } else { 255 };
+
+    octree.write(dvec3(x_pos, y_pos, z_pos) * (t / 51.0).cos(), 255, 4);
 
     let flatten = octree.flatten();
     let bytes = flatten.as_bytes();
+    dbg!(bytes.len());
 
     buffer.write(0, bytes);
 }
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut app = Application::new()?;
+    // std::thread::sleep(std::time::Duration::from_secs_f32(3.0));
+
     create_octree(&mut app);
-    app.add_task(update_camera).add_task(write_octree);
+    app.add_task(update_camera); //.add_task(write_octree);
     app.run();
 
     Ok(())
 }
+
+// fn main() {
+//     let mut octree = OctreeNode::default();
+//
+//     octree.write(dvec3(-1.0, -1.0, -1.0), 255, 2);
+//     octree.write(dvec3(0.0, 0.0, 0.0), 255, 2);
+//
+//     octree.write(dvec3(-1.0, 0.0, 0.0), 255, 2);
+//     octree.write(dvec3(0.0, -1.0, 0.0), 255, 2);
+//     octree.write(dvec3(0.0, 0.0, -1.0), 255, 2);
+//
+//     octree.write(dvec3(-1.0, 0.0, 0.0), 255, 2);
+//     octree.write(dvec3(-1.0, -1.0, 0.0), 255, 2);
+//     octree.write(dvec3(-1.0, 0.0, -1.0), 255, 2);
+//     octree.write(dvec3(0.0, -1.0, -1.0), 255, 2);
+//
+//
+//     let flat = octree.flatten();
+//     dbg!(flat);
+// }

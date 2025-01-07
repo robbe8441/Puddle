@@ -88,7 +88,7 @@ impl World {
         let mut batch = RenderBatch::default();
         batch.set_material(material.clone());
 
-        renderer.set_uniform_buffer(uniform_buffer.clone());
+        renderer.set_uniform_buffer(uniform_buffer.clone(), 0);
 
         let cube_draw = DrawData {
             vertex_count: CUBE_VERTECIES.len() as u32,

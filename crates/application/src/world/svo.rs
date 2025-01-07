@@ -5,22 +5,18 @@
     clippy::module_name_repetitions
 )]
 
-use std::{
-    alloc::{alloc, dealloc, Layout},
-    collections::VecDeque,
-    fmt::Debug,
-    ptr::NonNull,
-    sync::Arc,
-};
+use std::{collections::VecDeque, fmt::Debug, sync::Arc};
 
 use math::{dvec3, DVec3};
 
 /// |  64 bit   |    8 bit      |    24 bit   |
 ///    colors      valid mask      child ptr
+#[repr(C)]
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct FlatOctreeNode {
     colors: ColorData,
     child_descriptor: u32,
+    _padding: u32,
 }
 
 #[allow(clippy::missing_fields_in_debug)]
@@ -72,7 +68,7 @@ impl FlatOctreeNode {
 
 /// 64 bit of color data
 /// every voxel has 8 bits for colors => 255 colors for every octree
-#[derive(Default, Clone, PartialEq, Eq)]
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct ColorData(u64);
 
 impl ColorData {
@@ -82,28 +78,42 @@ impl ColorData {
         self.0 &= !(0xFF << (index * 8));
         self.0 |= (color as u64) << (index * 8);
     }
+
+    pub fn set_all_colors(&mut self, color: u8) {
+        self.0 = 0;
+        for i in 0..8 {
+            self.0 |= (color as u64) << (i * 8);
+        }
+    }
+
     #[must_use]
     pub fn get_color(&self, index: u8) -> u8 {
         (self.0 >> (index * 8)) as u8
+    }
+
+    #[must_use]
+    pub fn are_equal(&self) -> bool {
+        let color = self.get_color(0);
+        (1..8).all(|i| self.get_color(i) == color)
     }
 }
 
 #[derive(Default)]
 pub struct OctreeNode {
     colors: ColorData,
-    children: [Option<NonNull<OctreeNode>>; 8],
+    children: [Option<Box<OctreeNode>>; 8],
 }
 
 impl OctreeNode {
     pub const NODE_POS: [DVec3; 8] = [
-        dvec3(-0.5, -0.5, -0.5),
-        dvec3(0.5, -0.5, -0.5),
-        dvec3(-0.5, 0.5, -0.5),
-        dvec3(0.5, 0.5, -0.5),
-        dvec3(-0.5, -0.5, 0.5),
-        dvec3(0.5, -0.5, 0.5),
-        dvec3(-0.5, 0.5, 0.5),
-        dvec3(0.5, 0.5, 0.5),
+        dvec3(-1.0, -1.0, -1.0),
+        dvec3(1.0, -1.0, -1.0),
+        dvec3(-1.0, 1.0, -1.0),
+        dvec3(1.0, 1.0, -1.0),
+        dvec3(-1.0, -1.0, 1.0),
+        dvec3(1.0, -1.0, 1.0),
+        dvec3(-1.0, 1.0, 1.0),
+        dvec3(1.0, 1.0, 1.0),
     ];
 
     /// get the valid mask of the node
@@ -117,56 +127,71 @@ impl OctreeNode {
         valid_mask
     }
     /// write once to the octree
-    /// position must contain values between 0 and 1
+    /// position must contain values between -1 and 1
     /// ``total_layers`` is how deep it should go in to the tree
     pub fn write(&mut self, pos: DVec3, color: u8, layer: usize) {
-        let mut node: &mut OctreeNode = self;
-        let mut center = DVec3::ONE * 0.5;
+        self.write_intern(pos, DVec3::ZERO, 1.0, color, layer);
+    }
 
-        for current_layer in 1..layer {
-            let index: u8 = (pos.x > center.x) as u8
-                | ((pos.y > center.y) as u8) << 1
-                | ((pos.z > center.z) as u8) << 2;
-
-            center += Self::NODE_POS[index as usize] * (0.5 / current_layer as f64);
-
-            node.colors.set_color(index, color);
-
-            let new_node = &mut node.children[index as usize];
-            if new_node.is_none() {
-                let mem: *mut OctreeNode = unsafe { alloc(Layout::new::<OctreeNode>()) }.cast();
-                unsafe { mem.write(OctreeNode::default()) };
-                *new_node = NonNull::new(mem);
-            }
-            node = unsafe { new_node.unwrap_unchecked().as_mut() };
-        }
-
-        // just set the color on the last node, without adding a child node
+    fn write_intern(
+        &mut self,
+        pos: DVec3,
+        mut center: DVec3,
+        mut scale: f64,
+        color: u8,
+        layers: usize,
+    ) -> bool {
         let index: u8 = (pos.x > center.x) as u8
             | ((pos.y > center.y) as u8) << 1
             | ((pos.z > center.z) as u8) << 2;
 
-        node.colors.set_color(index, color);
+        scale *= 0.5;
+        center += scale * Self::NODE_POS[index as usize];
+
+        if layers > 1 {
+            let child_node = self.children[index as usize].get_or_insert_with(|| {
+                let mut colors = ColorData::default();
+                colors.set_all_colors(self.colors.get_color(index));
+
+                Box::new(OctreeNode {
+                    colors,
+                    ..Default::default()
+                })
+            });
+
+            let res = child_node.write_intern(pos, center, scale, color, layers - 1);
+
+            if res {
+                self.children[index as usize] = None;
+            }
+        } else {
+            self.children[index as usize] = None;
+        }
+
+        self.colors.set_color(index, color);
+        self.colors.are_equal() && self.get_valid_mask() == 0
     }
 
     /// lookup one value in the octree
-    /// position must contain values between 0 and 1
+    /// position must contain values between -1 and 1
     /// ``total_layers`` is how deep it should go in to the tree, doesn't need to be the same when
     /// writing to the tree, this can be used for LOD's
     #[must_use]
     pub fn sample(&self, pos: DVec3, max_layers: usize) -> u8 {
         let mut node: &OctreeNode = self;
-        let mut center = DVec3::ONE * 0.5;
+        let mut center = DVec3::splat(0.0);
+        let mut scale = 1.0;
 
-        for current_layer in 1..max_layers {
+        for _ in 1..max_layers {
             let index: u8 = (pos.x > center.x) as u8
                 | ((pos.y > center.y) as u8) << 1
                 | ((pos.z > center.z) as u8) << 2;
 
-            let next_node = node.children[index as usize];
+            scale *= 0.5;
+            let next_node = &node.children[index as usize];
             if let Some(next_node) = next_node {
-                center += Self::NODE_POS[index as usize] * (0.5 / current_layer as f64);
-                node = unsafe { next_node.as_ref() };
+                center += scale * Self::NODE_POS[index as usize];
+                node = next_node.as_ref();
             } else {
                 break;
             }
@@ -175,6 +200,7 @@ impl OctreeNode {
         let index: u8 = (pos.x > center.x) as u8
             | ((pos.y > center.y) as u8) << 1
             | ((pos.z > center.z) as u8) << 2;
+
         node.colors.get_color(index)
     }
 
@@ -183,11 +209,11 @@ impl OctreeNode {
     /// this is used to store it in a file or a buffer for the GPU
     #[must_use]
     pub fn flatten(&self) -> FlatOctree {
-        let mut stack: VecDeque<NonNull<OctreeNode>> = VecDeque::new();
+        let mut stack: VecDeque<&Box<OctreeNode>> = VecDeque::new();
         let mut flat_tree = vec![];
 
         let mut flat_root = FlatOctreeNode {
-            colors: self.colors.clone(),
+            colors: self.colors,
             ..Default::default()
         };
         flat_root.set_valid_mask(self.get_valid_mask());
@@ -196,11 +222,9 @@ impl OctreeNode {
 
         stack.extend(self.children.iter().filter_map(|v| v.as_ref()));
 
-        while let Some(mut node) = stack.pop_front() {
-            let node = unsafe { node.as_mut() };
-
+        while let Some(node) = stack.pop_front() {
             let mut flat_node = FlatOctreeNode {
-                colors: node.colors.clone(),
+                colors: node.colors,
                 ..Default::default()
             };
             flat_node.set_valid_mask(node.get_valid_mask());
@@ -229,8 +253,10 @@ impl FlatOctree {
             index: usize, // the index of this node in the flat array
         }
 
-        let mut root = OctreeNode::default();
-        root.colors = self.data[0].colors.clone();
+        let mut root = OctreeNode {
+            colors: self.data[0].colors,
+            ..Default::default()
+        };
 
         let mut stack = vec![StackNode {
             ptr: &mut root,
@@ -246,17 +272,20 @@ impl FlatOctree {
                 let child = &self.data[child_index];
 
                 let node = OctreeNode {
-                    colors: child.colors.clone(),
+                    colors: child.colors,
                     ..Default::default()
                 };
 
-                let mem: *mut OctreeNode = unsafe { alloc(Layout::new::<OctreeNode>()) }.cast();
-                unsafe { mem.write(node) };
-                unsafe { &mut *stack_node.ptr }.children[j] = NonNull::new(mem);
+                let boxed_node = Box::new(node);
+                unsafe { (*stack_node.ptr).children[j] = Some(boxed_node) };
+
+                let mem_ptr = unsafe {
+                    Box::as_mut_ptr((*stack_node.ptr).children[j].as_mut().unwrap_unchecked())
+                };
 
                 stack.push(StackNode {
                     index: child_index,
-                    ptr: mem,
+                    ptr: mem_ptr,
                 });
             }
         }
@@ -284,36 +313,10 @@ impl FlatOctree {
     }
 }
 
-impl Drop for OctreeNode {
-    fn drop(&mut self) {
-        self.children.into_iter().flatten().for_each(|v| unsafe {
-            v.drop_in_place();
-            dealloc(v.as_ptr().cast(), Layout::new::<Self>());
-        });
-    }
-}
-
-impl Debug for OctreeNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("OctreeNode")
-            .field("colors", &format!("{:b}", self.colors.0))
-            .field_with("children", |f| {
-                for v in &self.children {
-                    match v {
-                        None => f.pad("empty\n")?,
-                        Some(v) => f.pad(&format!("{:?}", unsafe { v.as_ref() }))?,
-                    }
-                }
-                Ok(())
-            })
-            .finish()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::{FlatOctree, FlatOctreeNode, OctreeNode};
-    use glam::dvec3;
+    use math::dvec3;
 
     #[test]
     fn valid_mask() {
@@ -379,4 +382,3 @@ mod tests {
         }
     }
 }
-
