@@ -56,7 +56,7 @@ impl Buffer {
 
         let ptr = unsafe { ptr.as_ptr().cast::<T>().add(offset) };
 
-        let len = data.len().max(self.size as usize / size_of::<T>());
+        let len = data.len().min(self.size as usize / size_of::<T>());
 
         let slice = unsafe { std::slice::from_raw_parts_mut(ptr, len) };
         slice.copy_from_slice(data);

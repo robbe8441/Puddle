@@ -27,7 +27,7 @@ fn create_octree(app: &mut Application) {
     .unwrap();
 
     let handle = app.renderer.set_storage_buffer(voxel_buffer.clone(), 0);
-    assert!(handle.binding == 0);
+    assert!(handle.index == 0);
 
     let mut octree = OctreeNode::default();
     octree.write(dvec3(1.0, 1.0, 1.0), 255, 1);

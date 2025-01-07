@@ -84,30 +84,61 @@ impl RenderHandler {
     }
 
     #[inline]
-    pub fn set_uniform_buffer(&mut self, buffer: Arc<Buffer>) -> BindlessResourceHandle {
-        self.bindless_handler
-            .set_uniform_buffer(&self.device, buffer)
-    }
-
-    #[inline]
-    pub fn set_storage_buffer(&mut self, buffer: Arc<Buffer>) -> BindlessResourceHandle {
-        self.bindless_handler
-            .set_storage_buffer(&self.device, buffer)
-    }
-
-    #[inline]
-    pub fn set_storage_image(
+    pub fn set_uniform_buffer(
         &mut self,
-        image: vk::ImageView,
-        layout: vk::ImageLayout,
+        buffer: Arc<Buffer>,
+        index: usize,
     ) -> BindlessResourceHandle {
-        self.bindless_handler
-            .set_storage_image(&self.device, image, layout)
+        self.bindless_handler.upload_buffer(
+            &self.device,
+            buffer.handle(),
+            vk::DescriptorType::UNIFORM_BUFFER,
+            BindlessHandler::UNIFORM_BUFFER_BINDING,
+            index as u32,
+        );
+
+        self.bindless_handler.uniform_buffers[index] = Some(buffer);
+
+        BindlessResourceHandle {
+            index,
+            ty: bindless::BindlessResourceType::UniformBuffer,
+        }
     }
+    #[inline]
+    pub fn set_storage_buffer(
+        &mut self,
+        buffer: Arc<Buffer>,
+        index: usize,
+    ) -> BindlessResourceHandle {
+        self.bindless_handler.upload_buffer(
+            &self.device,
+            buffer.handle(),
+            vk::DescriptorType::STORAGE_BUFFER,
+            BindlessHandler::STORAGE_BUFFER_BINDING,
+            index as u32,
+        );
+
+        self.bindless_handler.storage_buffers[index] = Some(buffer);
+
+        BindlessResourceHandle {
+            index,
+            ty: bindless::BindlessResourceType::StorageBuffer,
+        }
+    }
+
+    // #[inline] TODO
+    // pub fn set_storage_image(
+    //     &mut self,
+    //     image: vk::ImageView,
+    //     layout: vk::ImageLayout,
+    // ) -> BindlessResourceHandle {
+    //     self.bindless_handler
+    //         .set_storage_image(&self.device, image, layout)
+    // }
 
     /// # Errors
     /// # Safety
-    pub unsafe fn resize(&self, new_size: [u32; 2]) -> VkResult<()> {
+    pub unsafe fn on_window_resize(&self, new_size: [u32; 2]) -> VkResult<()> {
         self.device.device_wait_idle()?;
         self.swapchain.recreate(self.device.clone(), new_size)?;
         Ok(())
@@ -115,7 +146,7 @@ impl RenderHandler {
 
     /// # Safety
     /// # Errors
-    pub unsafe fn draw(&mut self) -> VkResult<()> {
+    pub unsafe fn on_render(&mut self) -> VkResult<()> {
         self.frames[self.frame_index].execute(
             &self.device,
             &self.swapchain,
@@ -130,11 +161,6 @@ impl RenderHandler {
     pub fn get_swapchain_resolution(&self) -> vk::Extent2D {
         unsafe { (*self.swapchain.create_info.get()).image_extent }
     }
-
-    /// # Safety
-    /// invalidates all shaders, descriptor sets and frame-handers
-    /// the device still stays valid
-    pub unsafe fn destroy(&self) {}
 }
 
 impl Drop for RenderHandler {
