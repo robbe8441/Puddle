@@ -1,5 +1,6 @@
 use math::{Mat4, Transform};
 
+#[derive(Debug, Clone)]
 pub struct Camera {
     pub transform: Transform,
     pub aspect: f32,

@@ -1,9 +1,7 @@
 
-![Flower](./resources/Flower.mp4)
-
-![BuggyGalaxy](./resources/BuggyGalaxy.mp4)
-![Flower](./resources/Flower.mp4)
-![Fog](./resources/Fog.mp4)
-![Galaxy](./resources/Galaxy.mp4)
-![OctreeWorking](./resources/OctreeWorking.mp4)
+![Flower](https://youtu.be/bbTiYvD2MgA)
+![Galaxy](https://youtu.be/FuQxeVE_nL0)
+![Fog](https://youtu.be/fyOI-npZN78)
+![BuggyGalaxy](https://youtu.be/2AGzruWPmiM)
+![OctreeWorking](https://youtu.be/MyL9dZfEoOE)
 

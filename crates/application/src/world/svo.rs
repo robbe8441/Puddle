@@ -9,35 +9,29 @@ use std::{collections::VecDeque, fmt::Debug, sync::Arc};
 
 use math::{dvec3, DVec3};
 
+/// 64 bit of color data
+/// every voxel has 8 bits for colors => 255 colors for every octree
+/// TODO: the colors are later stored in a lookup-table using the color as index
+#[repr(transparent)]
+#[derive(Default, Clone, Copy, PartialEq, Eq)]
+pub struct ColorData(u64);
+
+/// a flat/linear representation of an octree
+/// this is the format used when storing an octree in a file or buffer for rendering
 /// |  64 bit   |    8 bit      |    24 bit   |
 ///    colors      valid mask      child ptr
 #[repr(C)]
 #[derive(Default, Clone, PartialEq, Eq)]
 pub struct FlatOctreeNode {
     colors: ColorData,
+    /// contains the ``valid_mask`` and the ``child_pointer``
     child_descriptor: u32,
+
+    /// needed because of alignment, may be used later for lighting
     _padding: u32,
 }
 
-#[allow(clippy::missing_fields_in_debug)]
-impl Debug for FlatOctreeNode {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mask = self.get_valid_mask();
-        let valid_mask: String = (0..8).map(|i| ((mask >> i) & 1).to_string()).collect();
-
-        f.debug_struct("FlatOctreeNode")
-            .field("valid_mask", &valid_mask)
-            .field("child_ptr", &self.get_child_ptr())
-            .field_with("colors", |f| {
-                f.debug_list()
-                    .entries((0..8).map(|i| self.colors.get_color(i)))
-                    .finish()
-            })
-            .finish()
-    }
-}
-
-#[derive(Default, Debug, PartialEq, Eq)]
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
 pub struct FlatOctree {
     data: Arc<[FlatOctreeNode]>,
 }
@@ -55,7 +49,7 @@ impl FlatOctreeNode {
         (self.child_descriptor >> 24) as u8
     }
 
-    /// sets the index of where the children are located in the buffer
+    /// sets the index of where the children are located in the array
     pub fn set_child_ptr(&mut self, val: u32) {
         self.child_descriptor &= !0xFFF_FFF;
         self.child_descriptor |= val & 0xFFF_FFF;
@@ -66,11 +60,6 @@ impl FlatOctreeNode {
     }
 }
 
-/// 64 bit of color data
-/// every voxel has 8 bits for colors => 255 colors for every octree
-#[derive(Default, Clone, Copy, PartialEq, Eq)]
-pub struct ColorData(u64);
-
 impl ColorData {
     /// set the color at a given index
     /// the index shouldn't exceed 0-7 (3 bits)
@@ -79,6 +68,7 @@ impl ColorData {
         self.0 |= (color as u64) << (index * 8);
     }
 
+    /// sets all colors to the given value
     pub fn set_all_colors(&mut self, color: u8) {
         self.0 = 0;
         for i in 0..8 {
@@ -86,6 +76,7 @@ impl ColorData {
         }
     }
 
+    /// 
     #[must_use]
     pub fn get_color(&self, index: u8) -> u8 {
         (self.0 >> (index * 8)) as u8
@@ -126,9 +117,10 @@ impl OctreeNode {
         }
         valid_mask
     }
+
     /// write once to the octree
     /// position must contain values between -1 and 1
-    /// ``total_layers`` is how deep it should go in to the tree
+    /// ``layer`` is how deep it should go in to the tree
     pub fn write(&mut self, pos: DVec3, color: u8, layer: usize) {
         self.write_intern(pos, DVec3::ZERO, 1.0, color, layer);
     }
@@ -310,6 +302,24 @@ impl FlatOctree {
         Self {
             data: unsafe { std::slice::from_raw_parts(ptr, node_count) }.into(),
         }
+    }
+}
+
+#[allow(clippy::missing_fields_in_debug)]
+impl Debug for FlatOctreeNode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mask = self.get_valid_mask();
+        let valid_mask: String = (0..8).map(|i| ((mask >> i) & 1).to_string()).collect();
+
+        f.debug_struct("FlatOctreeNode")
+            .field("valid_mask", &valid_mask)
+            .field("child_ptr", &self.get_child_ptr())
+            .field_with("colors", |f| {
+                f.debug_list()
+                    .entries((0..8).map(|i| self.colors.get_color(i)))
+                    .finish()
+            })
+            .finish()
     }
 }
 

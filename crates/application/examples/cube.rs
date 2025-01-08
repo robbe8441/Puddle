@@ -37,7 +37,8 @@ fn create_octree(app: &mut Application) {
 fn write_octree(world: &mut World) {
     let buffer = &world.voxel_buffers[0];
     let octree = &mut world.voxel_octrees[0];
-    let t = world.start_time.elapsed().as_secs_f64() * 5.0;
+    let t = world.start_time.elapsed().as_secs_f64() * 1.0;
+
 
     let h = (t * 1.1).sin();
     octree.write(dvec3(t.sin() * h, h, t.cos() * h), 255, 10);
@@ -50,7 +51,7 @@ fn write_octree(world: &mut World) {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut app = Application::new()?;
-    // std::thread::sleep(std::time::Duration::from_secs_f32(3.0));
+    std::thread::sleep(std::time::Duration::from_secs_f32(3.0));
 
     create_octree(&mut app);
     app.add_task(update_camera).add_task(write_octree);

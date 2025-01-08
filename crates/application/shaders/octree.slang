@@ -132,5 +132,5 @@ uint trace_ray(uint octree_index, Ray ray, out Hit hit) {
         }
     }
 
-    return stepps * 2;
+    return stepps * 5;
 }

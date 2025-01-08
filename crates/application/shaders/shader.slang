@@ -49,8 +49,10 @@ FragmentOutput fs_main(VertexStageOutput input) {
   let uniform = GetUniformBuffer<Uniforms>(0);
 
   var hit : Hit;
-  let ray_dir = normalize(input.vertex_pos - uniform.cam_pos.xyz);
-  let ray = Ray(uniform.cam_pos.xyz * 100.0, ray_dir, 1.0f / ray_dir);
+  let cam_pos = uniform.cam_pos.xyz;
+  // let cam_pos = float3(0.2, 0.3, 1.2);
+  let ray_dir = normalize(input.vertex_pos - cam_pos);
+  let ray = Ray(cam_pos * 100.0, ray_dir, 1.0f / ray_dir);
 
   let color_index = trace_ray(0, ray, hit);
 
