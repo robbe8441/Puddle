@@ -142,8 +142,8 @@ impl OctreeNode {
         layers: usize,
     ) -> bool {
         let index: u8 = (pos.x > center.x) as u8
-            | ((pos.y > center.y) as u8) << 1
-            | ((pos.z > center.z) as u8) << 2;
+            | (((pos.y > center.y) as u8) << 1)
+            | (((pos.z > center.z) as u8) << 2);
 
         scale *= 0.5;
         center += scale * Self::NODE_POS[index as usize];
@@ -184,8 +184,8 @@ impl OctreeNode {
 
         for _ in 1..max_layers {
             let index: u8 = (pos.x > center.x) as u8
-                | ((pos.y > center.y) as u8) << 1
-                | ((pos.z > center.z) as u8) << 2;
+                | (((pos.y > center.y) as u8) << 1)
+                | (((pos.z > center.z) as u8) << 2);
 
             scale *= 0.5;
             let next_node = &node.children[index as usize];
@@ -198,8 +198,8 @@ impl OctreeNode {
         }
 
         let index: u8 = (pos.x > center.x) as u8
-            | ((pos.y > center.y) as u8) << 1
-            | ((pos.z > center.z) as u8) << 2;
+            | (((pos.y > center.y) as u8) << 1)
+            | (((pos.z > center.z) as u8) << 2);
 
         node.colors.get_color(index)
     }

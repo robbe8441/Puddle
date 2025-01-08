@@ -71,7 +71,6 @@ struct VoxelData {
 uint trace_ray(uint octree_index, Ray ray, out Hit hit) {
     let voxel_data = GetStorageBuffer<VoxelData>(octree_index);
 
-    uint index = 0;
     float scale = 50.0;
     float3 center = float3(0.0);
     float3 minBox = center - scale;
@@ -83,43 +82,41 @@ uint trace_ray(uint octree_index, Ray ray, out Hit hit) {
         float scale;
     };
     Stack stack[20];
-    uint stack_index = 0;
+    uint stack_index = 1;
 
     scale *= 0.5;
 
-    stack[stack_index++] = Stack(0u, center, scale);
+    stack[0] = Stack(0u, center, scale);
 
     var stepps = 0;
 
     while(stack_index-- > 0) {
+        let index = stack[stack_index].index;
         center = stack[stack_index].center;
-        index = stack[stack_index].index;
         scale = stack[stack_index].scale;
 
         let voxel_node = voxel_data[index];
 
-        uint voxel_child_ptr = voxel_node.get_child_ptr();
+        uint child_ptr = voxel_node.get_child_ptr();
+        uint valid_mask = voxel_node.get_valid_mask();
 
-        uint voxel_valid_mask = voxel_node.get_valid_mask();
-
-        uint child_ptr_offset = 0u;
         stepps++;
 
-        for (uint i = 0u; i < 8u; ++i) {
+        for (uint i = 0u; i < 8u; i++) {
+            bool is_leaf = ((1 << i) & valid_mask) == 0;
             bool empty = voxel_node.get_color(i) == 0;
-            bool is_leaf = voxel_valid_mask << i == 0;
+
             if (empty){
                 continue;
             }
 
-            
             float3 new_center = center + scale * NODE_POS[i];
             float3 minBox = new_center - scale;
             float3 maxBox = new_center + scale;
             
             if (!BBoxIntersect(minBox, maxBox, ray, hit)){
                 if(!is_leaf){
-                   child_ptr_offset += 1u;
+                   child_ptr++;
                 }
                 continue;
             }
@@ -130,11 +127,10 @@ uint trace_ray(uint octree_index, Ray ray, out Hit hit) {
                 hit.n = box_normal(new_center, minBox, maxBox, hit_pos);
                 return voxel_node.get_color(i);
             } else {
-                stack[stack_index++] = Stack(voxel_child_ptr+child_ptr_offset, new_center, scale*0.5f);
-                child_ptr_offset += 1u;
+                stack[stack_index++] = Stack(child_ptr++, new_center, scale*0.5f);
             }
         }
     }
 
-    return 0;
+    return stepps * 2;
 }
