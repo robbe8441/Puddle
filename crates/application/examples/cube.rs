@@ -51,7 +51,7 @@ fn write_octree(world: &mut World) {
 
 fn main() -> Result<(), Box<dyn Error>> {
     let mut app = Application::new()?;
-    std::thread::sleep(std::time::Duration::from_secs_f32(3.0));
+    // std::thread::sleep(std::time::Duration::from_secs_f32(3.0));
 
     create_octree(&mut app);
     app.add_task(update_camera).add_task(write_octree);

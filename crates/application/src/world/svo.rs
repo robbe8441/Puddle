@@ -1,9 +1,4 @@
-#![allow(
-    clippy::cast_lossless,
-    clippy::cast_precision_loss,
-    clippy::cast_possible_truncation,
-    clippy::module_name_repetitions
-)]
+#![allow(clippy::cast_lossless, clippy::cast_possible_truncation)]
 
 use std::{collections::VecDeque, fmt::Debug, sync::Arc};
 
@@ -11,54 +6,12 @@ use math::{dvec3, DVec3};
 
 /// 64 bit of color data
 /// every voxel has 8 bits for colors => 255 colors for every octree
+///
 /// TODO: the colors are later stored in a lookup-table using the color as index
+/// this isn't implemented at the moment
 #[repr(transparent)]
 #[derive(Default, Clone, Copy, PartialEq, Eq)]
 pub struct ColorData(u64);
-
-/// a flat/linear representation of an octree
-/// this is the format used when storing an octree in a file or buffer for rendering
-/// |  64 bit   |    8 bit      |    24 bit   |
-///    colors      valid mask      child ptr
-#[repr(C)]
-#[derive(Default, Clone, PartialEq, Eq)]
-pub struct FlatOctreeNode {
-    colors: ColorData,
-    /// contains the ``valid_mask`` and the ``child_pointer``
-    child_descriptor: u32,
-
-    /// needed because of alignment, may be used later for lighting
-    _padding: u32,
-}
-
-#[derive(Default, Clone, Debug, PartialEq, Eq)]
-pub struct FlatOctree {
-    data: Arc<[FlatOctreeNode]>,
-}
-
-#[allow(unused)]
-impl FlatOctreeNode {
-    /// valid mask tells how many and what child nodes there are
-    /// each bit is one child node, this is only needed for flat octree's
-    pub fn set_valid_mask(&mut self, mask: u8) {
-        self.child_descriptor &= !(0xFF << 24);
-        self.child_descriptor |= (mask as u32) << 24;
-    }
-    #[must_use]
-    pub fn get_valid_mask(&self) -> u8 {
-        (self.child_descriptor >> 24) as u8
-    }
-
-    /// sets the index of where the children are located in the array
-    pub fn set_child_ptr(&mut self, val: u32) {
-        self.child_descriptor &= !0xFFF_FFF;
-        self.child_descriptor |= val & 0xFFF_FFF;
-    }
-    #[must_use]
-    pub fn get_child_ptr(&self) -> u32 {
-        self.child_descriptor & 0xFFF_FFF
-    }
-}
 
 impl ColorData {
     /// set the color at a given index
@@ -76,7 +29,6 @@ impl ColorData {
         }
     }
 
-    /// 
     #[must_use]
     pub fn get_color(&self, index: u8) -> u8 {
         (self.0 >> (index * 8)) as u8
@@ -89,6 +41,13 @@ impl ColorData {
     }
 }
 
+/// one node of an octree
+/// every node has up to 8 child nodes
+/// if the child node is None and the color is anything except 0, then its considered a leaf node
+/// next nodes are stored as a Box, after some testing this didn't really make a difference
+/// compared to raw pointers
+/// in future this might use the ``PoolAllocator`` in the ``allocators`` crate
+/// but this would make resizing more complicated so i haven't implemented it right now
 #[derive(Default)]
 pub struct OctreeNode {
     colors: ColorData,
@@ -120,11 +79,15 @@ impl OctreeNode {
 
     /// write once to the octree
     /// position must contain values between -1 and 1
+    /// this calls a function recursively and might cause a ``stack_overflow``
+    /// but shouldn't happen as a layer of 15 is already so small that you cant see it anymore
     /// ``layer`` is how deep it should go in to the tree
     pub fn write(&mut self, pos: DVec3, color: u8, layer: usize) {
         self.write_intern(pos, DVec3::ZERO, 1.0, color, layer);
     }
 
+    /// returns if the node written to can be turned in to a leaf node
+    /// (if all colors are the same and there are no child nodes, then just make it one big node)
     fn write_intern(
         &mut self,
         pos: DVec3,
@@ -151,9 +114,7 @@ impl OctreeNode {
                 })
             });
 
-            let res = child_node.write_intern(pos, center, scale, color, layers - 1);
-
-            if res {
+            if child_node.write_intern(pos, center, scale, color, layers - 1) {
                 self.children[index as usize] = None;
             }
         } else {
@@ -164,17 +125,17 @@ impl OctreeNode {
         self.colors.are_equal() && self.get_valid_mask() == 0
     }
 
-    /// lookup one value in the octree
-    /// position must contain values between -1 and 1
-    /// ``total_layers`` is how deep it should go in to the tree, doesn't need to be the same when
+    /// sample one value in the octree
+    /// position should be a value between -1 and 1
+    /// ``layer`` is how deep it should go in to the tree, doesn't need to be the same when
     /// writing to the tree, this can be used for LOD's
     #[must_use]
-    pub fn sample(&self, pos: DVec3, max_layers: usize) -> u8 {
+    pub fn sample(&self, pos: DVec3, layer: usize) -> u8 {
         let mut node: &OctreeNode = self;
         let mut center = DVec3::splat(0.0);
         let mut scale = 1.0;
 
-        for _ in 1..max_layers {
+        for _ in 1..layer {
             let index: u8 = (pos.x > center.x) as u8
                 | (((pos.y > center.y) as u8) << 1)
                 | (((pos.z > center.z) as u8) << 2);
@@ -235,6 +196,11 @@ impl OctreeNode {
     }
 }
 
+#[derive(Default, Clone, Debug, PartialEq, Eq)]
+pub struct FlatOctree {
+    data: Arc<[FlatOctreeNode]>,
+}
+
 impl FlatOctree {
     /// convert a flat octree back to a normal octree
     /// for example after loading it from a file
@@ -272,6 +238,8 @@ impl FlatOctree {
                 unsafe { (*stack_node.ptr).children[j] = Some(boxed_node) };
 
                 let mem_ptr = unsafe {
+                    // we need a pointer to that box after we moved it in to the vector
+                    // because we just wrote to index j, we don't need to check if its really Some
                     Box::as_mut_ptr((*stack_node.ptr).children[j].as_mut().unwrap_unchecked())
                 };
 
@@ -295,6 +263,7 @@ impl FlatOctree {
     }
 
     /// convert the raw data back to an flat octree
+    /// TODO: add safety
     #[must_use]
     pub fn from_bytes(bytes: &[u8]) -> Self {
         let node_count = bytes.len() / std::mem::size_of::<FlatOctreeNode>();
@@ -302,6 +271,45 @@ impl FlatOctree {
         Self {
             data: unsafe { std::slice::from_raw_parts(ptr, node_count) }.into(),
         }
+    }
+}
+
+/// a flat/linear representation of an octree node
+/// this is the format used when storing an octree in a file or buffer for rendering
+/// |  64 bit   |    8 bit      |    24 bit   |
+///    colors      valid mask      child ptr
+#[repr(C)]
+#[derive(Default, Clone, PartialEq, Eq)]
+pub struct FlatOctreeNode {
+    colors: ColorData,
+    /// contains the ``valid_mask`` and the ``child_pointer``
+    child_descriptor: u32,
+
+    /// needed because of alignment, may be used later for lighting
+    _padding: u32,
+}
+
+#[allow(unused)]
+impl FlatOctreeNode {
+    /// valid mask tells how many and what child nodes there are
+    /// each bit is one child node, this is only needed for flat octree's
+    pub fn set_valid_mask(&mut self, mask: u8) {
+        self.child_descriptor &= !(0xFF << 24);
+        self.child_descriptor |= (mask as u32) << 24;
+    }
+    #[must_use]
+    pub fn get_valid_mask(&self) -> u8 {
+        (self.child_descriptor >> 24) as u8
+    }
+
+    /// sets the index of where the children are located in the array
+    pub fn set_child_ptr(&mut self, val: u32) {
+        self.child_descriptor &= !0xFFF_FFF;
+        self.child_descriptor |= val & 0xFFF_FFF;
+    }
+    #[must_use]
+    pub fn get_child_ptr(&self) -> u32 {
+        self.child_descriptor & 0xFFF_FFF
     }
 }
 
