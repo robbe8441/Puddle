@@ -1,6 +1,6 @@
 #![allow(clippy::cast_lossless, clippy::cast_possible_truncation)]
 
-use std::{collections::VecDeque, fmt::Debug, sync::Arc};
+use std::{collections::VecDeque, fmt::Debug, sync::Arc, usize};
 
 use math::{dvec3, DVec3};
 
@@ -39,6 +39,13 @@ impl ColorData {
         let color = self.get_color(0);
         (1..8).all(|i| self.get_color(i) == color)
     }
+}
+
+#[rustfmt::skip]
+const fn get_index(pos: DVec3, center: DVec3) -> u8 {
+    (pos.x > center.x) as u8
+    | (((pos.y > center.y) as u8) << 1)
+    | (((pos.z > center.z) as u8) << 2)
 }
 
 /// one node of an octree
@@ -83,46 +90,36 @@ impl OctreeNode {
     /// but shouldn't happen as a layer of 15 is already so small that you cant see it anymore
     /// ``layer`` is how deep it should go in to the tree
     pub fn write(&mut self, pos: DVec3, color: u8, layer: usize) {
-        self.write_intern(pos, DVec3::ZERO, 1.0, color, layer);
-    }
+        let mut node: &mut OctreeNode = self;
+        let mut center = DVec3::ZERO;
+        let mut scale = 1.0;
 
-    /// returns if the node written to can be turned in to a leaf node
-    /// (if all colors are the same and there are no child nodes, then just make it one big node)
-    fn write_intern(
-        &mut self,
-        pos: DVec3,
-        mut center: DVec3,
-        mut scale: f64,
-        color: u8,
-        layers: usize,
-    ) -> bool {
-        let index: u8 = (pos.x > center.x) as u8
-            | (((pos.y > center.y) as u8) << 1)
-            | (((pos.z > center.z) as u8) << 2);
+        for _ in 1..layer {
+            let index = get_index(pos, center) as usize;
 
-        scale *= 0.5;
-        center += scale * Self::NODE_POS[index as usize];
+            scale *= 0.5;
+            center += Self::NODE_POS[index] * scale;
 
-        if layers > 1 {
-            let child_node = self.children[index as usize].get_or_insert_with(|| {
-                let mut colors = ColorData::default();
-                colors.set_all_colors(self.colors.get_color(index));
+            node.colors.set_color(index as u8, color);
 
-                Box::new(OctreeNode {
-                    colors,
-                    ..Default::default()
-                })
-            });
-
-            if child_node.write_intern(pos, center, scale, color, layers - 1) {
-                self.children[index as usize] = None;
+            if let Some(child) = &mut node.children[index] {
+                if child.colors.are_equal()
+                    && child.children[get_index(pos, center) as usize].is_none()
+                {
+                    // NOTE: this doesn't work because the leaf node is set after the loop
+                    // so checking before it ended doesn't always work, fix this
+                    node.children[index] = None;
+                    break;
+                }
             }
-        } else {
-            self.children[index as usize] = None;
+
+            node = node.children[index]
+                .get_or_insert_with(|| Box::new(OctreeNode::default()))
+                .as_mut();
         }
 
-        self.colors.set_color(index, color);
-        self.colors.are_equal() && self.get_valid_mask() == 0
+        let index = get_index(pos, center);
+        node.colors.set_color(index, color);
     }
 
     /// sample one value in the octree
@@ -136,9 +133,7 @@ impl OctreeNode {
         let mut scale = 1.0;
 
         for _ in 1..layer {
-            let index: u8 = (pos.x > center.x) as u8
-                | (((pos.y > center.y) as u8) << 1)
-                | (((pos.z > center.z) as u8) << 2);
+            let index = get_index(pos, center);
 
             scale *= 0.5;
             let next_node = &node.children[index as usize];
@@ -150,10 +145,7 @@ impl OctreeNode {
             }
         }
 
-        let index: u8 = (pos.x > center.x) as u8
-            | (((pos.y > center.y) as u8) << 1)
-            | (((pos.z > center.z) as u8) << 2);
-
+        let index = get_index(pos, center);
         node.colors.get_color(index)
     }
 

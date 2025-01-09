@@ -75,7 +75,6 @@ fn main() -> Result<(), Box<dyn Error>> {
 //     octree.write(dvec3(-1.0, 0.0, -1.0), 255, 2);
 //     octree.write(dvec3(0.0, -1.0, -1.0), 255, 2);
 //
-//
 //     let flat = octree.flatten();
 //     dbg!(flat);
 // }
