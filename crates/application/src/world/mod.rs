@@ -55,17 +55,15 @@ impl World {
         )
         .unwrap();
 
-        let monkey = CUBE_VERTECIES;
-
         let vertex_buffer = Buffer::new(
             renderer.device.clone(),
-            (std::mem::size_of::<[f32; 4]>() * monkey.len()) as u64,
+            (std::mem::size_of::<[f32; 4]>() * CUBE_VERTECIES.len()) as u64,
             vk::BufferUsageFlags::VERTEX_BUFFER,
             vk::MemoryPropertyFlags::HOST_VISIBLE, // TODO: make device Local
         )
         .unwrap();
 
-        vertex_buffer.write(0, &monkey);
+        vertex_buffer.write(0, &CUBE_VERTECIES);
 
         let code = include_bytes!("../../shaders/shader.spv");
 
@@ -93,7 +91,7 @@ impl World {
         renderer.set_uniform_buffer(uniform_buffer.clone(), 0);
 
         let cube_draw = DrawData {
-            vertex_count: monkey.len() as u32,
+            vertex_count: CUBE_VERTECIES.len() as u32,
             vertex_size: std::mem::size_of::<[f32; 4]>() as u32,
             vertex_buffer: Some(vertex_buffer),
             vertex_attribute_descriptions: vec![vk::VertexInputAttributeDescription2EXT::default()
@@ -172,56 +170,3 @@ const CUBE_VERTECIES: [[f32; 4]; 36] = [
     [0.5, -0.5, 0.5, 1.0],   // vorne rechts
     [0.5, -0.5, -0.5, 1.0],  // hinten rechts
 ];
-
-pub fn parse_numbers<T: Default + FromStr>(input: String) -> Vec<T>
-where
-    <T as FromStr>::Err: std::fmt::Display,
-{
-    let mut res = vec![];
-
-    for num in input.split_whitespace() {
-        let parsed = match num.parse() {
-            Ok(r) => r,
-            Err(e) => {
-                panic!("Failed parsing number when loading model : {}", e);
-                continue;
-            }
-        };
-        res.push(parsed);
-    }
-
-    res
-}
-
-pub fn model_from_string(input: &str) -> Vec<[f32; 4]> {
-    let mut vertecies: Vec<[f32; 4]> = vec![];
-    let mut res = vec![];
-
-    use regex::Regex;
-
-    // best website everrr https://regexr.com/
-    let vertex_regex = Regex::new(r"v( -?\d+.\d+){3}").unwrap();
-    let index_regex = Regex::new(r"f (\d+)/\d*/\d* (\d+)/\d*/\d* (\d+)/\d*/\d*").unwrap();
-
-    for v in vertex_regex.find_iter(input) {
-        let vert = v.as_str().replace("v ", "");
-        let numbers: [f32; 3] = parse_numbers(vert).try_into().unwrap();
-        vertecies.push([numbers[0] * 0.5, numbers[1] * 0.5, numbers[2] * 0.5, 1.0]);
-    }
-
-    for line in index_regex.find_iter(input) {
-        let face = line.as_str().replace("f ", "");
-        let numbers: [usize; 3] = face
-            .split(&['/', ' '])
-            .step_by(3)
-            .map(|v| dbg!(v))
-            .map(|v| v.parse::<usize>().unwrap() - 1)
-            .collect::<Vec<_>>()
-            .try_into()
-            .unwrap();
-
-        res.extend(numbers.iter().map(|i| vertecies[*i]));
-    }
-
-    res
-}
