@@ -1,4 +1,4 @@
-use std::{ffi::c_void, ptr::NonNull, sync::Arc};
+use std::{ffi::c_void, ptr::NonNull, sync::Arc, usize};
 
 use ash::{prelude::VkResult, vk};
 
@@ -16,6 +16,7 @@ pub struct Buffer {
 
 impl Buffer {
     /// # Errors
+    /// if there is no space left to allocate
     pub fn new(
         device: Arc<VulkanDevice>,
         size: u64,
@@ -49,10 +50,15 @@ impl Buffer {
         .into())
     }
 
+    /// offset is in units of T, like an array index instead of Bytes
+    /// # Panics
+    /// if the buffer wasn't created with ``MemoryPropertyFlags::HOST_VISIBLE``
     pub fn write<T: Copy>(&self, offset: usize, data: &[T]) {
         let Some(ptr) = self.ptr else {
-            panic!("trying to write to a buffer that isnt devcie local");
+            panic!("trying to write to a buffer that isnt host visible");
         };
+
+        assert!(ptr.as_ptr() as usize % align_of::<T>() == 0);
 
         let ptr = unsafe { ptr.as_ptr().cast::<T>().add(offset) };
 
@@ -62,15 +68,39 @@ impl Buffer {
         slice.copy_from_slice(data);
     }
 
+    /// # Panics
+    /// if the buffer wasn't created with ``MemoryPropertyFlags::HOST_VISIBLE``
+    /// # Safety
+    /// this might contain uninitialized data
     #[must_use]
     pub fn read<T: Copy>(&self) -> &[T] {
+        let Some(ptr) = self.ptr else {
+            panic!("trying to write to a buffer that isnt host visible");
+        };
+
+        assert!(ptr.as_ptr() as usize % align_of::<T>() == 0);
+
+        let ptr = ptr.as_ptr().cast::<T>();
+
+        unsafe { std::slice::from_raw_parts(ptr, self.size as usize / size_of::<T>()) }
+    }
+
+    /// # Panics
+    /// if the buffer wasn't created with ``MemoryPropertyFlags::HOST_VISIBLE``
+    /// # Safety
+    /// this might contain uninitialized data
+    #[allow(clippy::mut_from_ref)] // we don't mutate the struct, just the data
+    #[must_use]
+    pub fn read_mut<T>(&self) -> &mut [T] {
         let Some(ptr) = self.ptr else {
             panic!("trying to read from a buffer that isnt devcie local");
         };
 
-        let ptr = unsafe { ptr.as_ptr().cast::<T>() };
+        assert!(ptr.as_ptr() as usize % align_of::<T>() == 0);
 
-        unsafe { std::slice::from_raw_parts(ptr, self.size as usize / size_of::<T>()) }
+        let ptr = ptr.as_ptr().cast::<T>();
+
+        unsafe { std::slice::from_raw_parts_mut(ptr, self.size as usize / size_of::<T>()) }
     }
 
     #[must_use]

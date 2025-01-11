@@ -6,7 +6,7 @@ use ash::{
 };
 
 pub struct FrameContext {
-    /// tells if the current context is currently executing
+    /// tells if this ``FrameContext`` is currently executing
     is_executing_fence: vk::Fence,
     /// tells when the image is ready to be drawn on to
     image_available_semaphore: vk::Semaphore,
@@ -38,8 +38,8 @@ impl FrameContext {
 
         let command_buffer = device.allocate_command_buffers(&command_buffer_info)?[0];
 
-        device.begin_command_buffer(command_buffer, &vk::CommandBufferBeginInfo::default())?;
-        device.end_command_buffer(command_buffer)?;
+        // device.begin_command_buffer(command_buffer, &vk::CommandBufferBeginInfo::default())?;
+        // device.end_command_buffer(command_buffer)?;
 
         Ok(Self {
             is_executing_fence,

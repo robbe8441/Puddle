@@ -154,3 +154,9 @@ impl BindlessHandler {
         device.destroy_pipeline_layout(self.pipeline_layout, None);
     }
 }
+
+/// gets the first value that is None in the array
+/// used find a free slot in the bindless array
+pub fn get_free_slot<T>(input: &[Option<T>]) -> Option<usize> {
+    input.iter().position(|v| v.is_none())
+}

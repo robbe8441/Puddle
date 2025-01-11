@@ -12,7 +12,9 @@ pub struct MemoryBlock {
 
 impl MemoryBlock {
     /// # Errors
+    /// if there is no space left to allocate
     /// # Panics
+    /// if the requested memory type doesn't exist
     pub fn new(
         device: Arc<VulkanDevice>,
         memory_requirements: vk::MemoryRequirements,
@@ -48,6 +50,7 @@ impl Drop for MemoryBlock {
     }
 }
 
+
 #[must_use]
 pub fn find_memorytype_index(
     memory_req: vk::MemoryRequirements,
@@ -61,5 +64,5 @@ pub fn find_memorytype_index(
             (1 << index) & memory_req.memory_type_bits != 0
                 && memory_type.property_flags & flags == flags
         })
-        .map(|(index, _memory_type)| index as _)
+    .map(|(index, _memory_type)| index as u32)
 }

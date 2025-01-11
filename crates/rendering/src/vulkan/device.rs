@@ -21,13 +21,16 @@ pub struct VulkanDevice {
     pub surface: vk::SurfaceKHR,
     pub surface_loader: ash::khr::surface::Instance,
 
+    // debugger is disabled in release mode
     #[cfg(debug_assertions)]
     debugger: debug::DebugHandler,
 }
 
 impl VulkanDevice {
     /// # Safety
+    /// the window needs be valid and must stay valid until the Device has been destroyed
     /// # Panics
+    /// if the window isn't valid
     /// # Errors
     /// if the vulkan API isn't available
     pub unsafe fn new<T>(window: &T) -> VkResult<Self>
@@ -101,7 +104,6 @@ unsafe fn create_instance(
 
     let mut extensions =
         ash_window::enumerate_required_extensions(display_handle.as_raw())?.to_vec();
-    // 11:42
 
     #[cfg(debug_assertions)]
     extensions.push(ash::ext::debug_utils::NAME.as_ptr());
@@ -119,7 +121,7 @@ unsafe fn create_instance(
     };
 
     let app_info = vk::ApplicationInfo::default()
-        .engine_name(c"puddle")
+        .engine_name(c"Puddle")
         .engine_version(vk::API_VERSION_1_0)
         .api_version(vk::API_VERSION_1_3);
 

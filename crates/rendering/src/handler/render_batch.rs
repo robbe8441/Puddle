@@ -6,29 +6,23 @@ use ash::vk;
 use log::error;
 use std::sync::Arc;
 
+/// ``DrawData`` contains all the data needed for a single Draw call
 #[derive(Default)]
 pub struct DrawData {
-    /// must be set if mode contains ``VERTEX_BUFFER``
+    /// if this is Some then ``vertex_attribute_descriptions`` must be set
     pub vertex_buffer: Option<Arc<Buffer>>,
-    /// must be set if mode contains ``INDEX_BUFFER``
-    pub index_buffer: Option<Arc<Buffer>>,
-    /// must be set if mode contains ``INDEX_BUFFER``
-    pub index_type: vk::IndexType,
-    /// must be set if mode contains ``INSTANCE_BUFFER``
+    /// if this is Some then ``instance_attribute_descriptions`` must be set
     pub instance_buffer: Option<Arc<Buffer>>,
-    /// defaults to 1 (cant be 0)
+    pub index_buffer: Option<Arc<Buffer>>,
+    pub index_type: vk::IndexType,
     pub instance_count: u32,
-    /// must be set if mode contains ``INDEX_BUFFER``
     pub index_count: u32,
-    /// must be always set (otherwise nothing is drawn)
     pub vertex_count: u32,
-    /// size of one vertex in bytes (only if mode contains ``VERTEX_BUFFER``)
+    /// the size of one vertex in bytes
     pub vertex_size: u32,
-    /// size of one instance in bytes (only if mode contains ``INSTANCE_BUFFER``)
+    /// the size of one instance in bytes
     pub instance_size: u32,
-    /// must be set if mode contains ``VERTEX_BUFFER``
     pub vertex_attribute_descriptions: Vec<vk::VertexInputAttributeDescription2EXT<'static>>,
-    /// must be set if mode contains ``INSTANCE_BUFFER``
     pub instance_attribute_descriptions: Vec<vk::VertexInputAttributeDescription2EXT<'static>>,
 }
 
@@ -38,6 +32,7 @@ impl DrawData {
         let mut vertex_attribute_desc = vec![];
         let mut vertex_buffers = vec![];
 
+        // if there is a vertex buffer then we need to set it as Vertex Input
         if let Some(vertex_b) = &self.vertex_buffer {
             debug_assert!(self.vertex_size > 0);
             vertex_input_desc.push(
@@ -50,6 +45,7 @@ impl DrawData {
             vertex_attribute_desc.extend(self.vertex_attribute_descriptions.iter());
         }
 
+        // if there is a instance buffer then we need to set it as Instance Input
         if let Some(instance_b) = &self.instance_buffer {
             debug_assert!(self.instance_size > 0);
             vertex_input_desc.push(
@@ -62,6 +58,7 @@ impl DrawData {
             vertex_attribute_desc.extend(self.instance_attribute_descriptions.iter());
         }
 
+        // if there is no Vertex/Instance input then we don't need to bind it
         if !vertex_buffers.is_empty() {
             let offsets = vec![0; vertex_buffers.len()];
             device.cmd_bind_vertex_buffers(cmd, 0, &vertex_buffers, &offsets);

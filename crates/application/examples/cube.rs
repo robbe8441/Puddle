@@ -13,7 +13,7 @@ fn update_camera(world: &mut World) {
     let t = world.start_time.elapsed().as_secs_f32() / 5.0;
 
     world.camera.transform =
-        Transform::from_xyz(t.cos() * 1.2, 0.2, t.sin() * 1.2).looking_at(Vec3::ZERO, Vec3::Y);
+        Transform::from_xyz(t.cos(), 0.5, t.sin()).looking_at(Vec3::ZERO, Vec3::Y);
 }
 
 fn create_octree(app: &mut Application) {
@@ -39,9 +39,15 @@ fn write_octree(world: &mut World) {
     let octree = &mut world.voxel_octrees[0];
     let t = world.start_time.elapsed().as_secs_f64() * 1.0;
 
+    let orbit_x = t.cos();
+    let orbit_z = t.sin();
 
-    let h = (t * 1.1).sin();
-    octree.write(dvec3(t.sin() * h, h, t.cos() * h), 255, 10);
+    let t = t * 1.1;
+    let x = orbit_x + (t / 2.1).cos();
+    let z = orbit_z + (t / 2.1).sin();
+    let y = x.powi(2) * z.powi(2);
+
+    octree.write(dvec3(x / 2.0, y / 10.0, z /  2.0), (orbit_x * orbit_z * 255.0).abs().max(10.0) as u8, 9);
 
     let flatten = octree.flatten();
     let bytes = flatten.as_bytes();
@@ -78,3 +84,4 @@ fn main() -> Result<(), Box<dyn Error>> {
 //     let flat = octree.flatten();
 //     dbg!(flat);
 // }
+

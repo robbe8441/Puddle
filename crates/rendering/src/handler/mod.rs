@@ -1,6 +1,6 @@
 use crate::vulkan::{Buffer, Swapchain, VulkanDevice};
 use ash::{prelude::VkResult, vk};
-use bindless::{BindlessHandler, BindlessResourceHandle};
+use bindless::{get_free_slot, BindlessHandler, BindlessResourceHandle};
 use frame::FrameContext;
 use render_batch::RenderBatch;
 use std::{ffi::CStr, io::Cursor, sync::Arc};
@@ -83,7 +83,7 @@ impl RenderHandler {
         self.batches.push(batch);
     }
 
-    #[inline]
+    /// sets the given index in the array to be this buffer
     pub fn set_uniform_buffer(
         &mut self,
         buffer: Arc<Buffer>,
@@ -104,7 +104,14 @@ impl RenderHandler {
             ty: bindless::BindlessResourceType::UniformBuffer,
         }
     }
-    #[inline]
+
+    /// sets the first free index to be this buffer
+    pub fn push_uniform_buffer(&mut self, buffer: Arc<Buffer>) -> Option<BindlessResourceHandle> {
+        let index = get_free_slot(&self.bindless_handler.uniform_buffers)?;
+        Some(self.set_uniform_buffer(buffer, index))
+    }
+
+    /// sets the given index in the array to be this buffer
     pub fn set_storage_buffer(
         &mut self,
         buffer: Arc<Buffer>,
@@ -126,33 +133,36 @@ impl RenderHandler {
         }
     }
 
-    // #[inline] TODO
-    // pub fn set_storage_image(
-    //     &mut self,
-    //     image: vk::ImageView,
-    //     layout: vk::ImageLayout,
-    // ) -> BindlessResourceHandle {
-    //     self.bindless_handler
-    //         .set_storage_image(&self.device, image, layout)
-    // }
+    /// sets the first free index to be this buffer
+    pub fn push_storage_buffer(&mut self, buffer: Arc<Buffer>) -> Option<BindlessResourceHandle> {
+        let index = get_free_slot(&self.bindless_handler.storage_buffers)?;
+        Some(self.set_storage_buffer(buffer, index))
+    }
+
+    // TODO
+    // pub fn set_storage_image() {}
 
     /// # Errors
-    /// # Safety
-    pub unsafe fn on_window_resize(&self, new_size: [u32; 2]) -> VkResult<()> {
-        self.device.device_wait_idle()?;
-        self.swapchain.recreate(self.device.clone(), new_size)?;
-        Ok(())
+    /// if there was an issue creating a new swapchain
+    /// for example if there is no memory left
+    pub fn on_window_resize(&self, new_size: [u32; 2]) -> VkResult<()> {
+        unsafe {
+            self.device.device_wait_idle()?;
+            self.swapchain.recreate(self.device.clone(), new_size)
+        }
     }
 
     /// # Safety
     /// # Errors
-    pub unsafe fn on_render(&mut self) -> VkResult<()> {
-        self.frames[self.frame_index].execute(
-            &self.device,
-            &self.swapchain,
-            &self.batches,
-            &self.bindless_handler,
-        )?;
+    pub fn on_render(&mut self) -> VkResult<()> {
+        unsafe {
+            self.frames[self.frame_index].execute(
+                &self.device,
+                &self.swapchain,
+                &self.batches,
+                &self.bindless_handler,
+            )?;
+        }
 
         self.frame_index = (self.frame_index + 1) % FLYING_FRAMES;
         Ok(())

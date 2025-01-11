@@ -10,3 +10,4 @@ allocators.path = "../allocators/"
 
 glfw = { version = "0.59.0", features = ["wayland"] }
 ash = "0.38.0"
+regex = "1.11.1"
