@@ -68,10 +68,10 @@ impl Application {
 
             for (_, event) in glfw::flush_messages(&self.window.glfw_events) {
                 match event {
-                    glfw::WindowEvent::Size(x, y) => {
-                        let _ = self.renderer.on_window_resize([x as u32, y as u32]);
-                        self.world.camera.aspect = x as f32 / y as f32;
-                    }
+                    // glfw::WindowEvent::Size(x, y) => {
+                    //     let _ = self.renderer.on_window_resize([x as u32, y as u32]);
+                    //     self.world.camera.aspect = x as f32 / y as f32;
+                    // }
                     glfw::WindowEvent::Close => {
                         self.window.window.set_should_close(true);
                     }

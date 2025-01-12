@@ -219,6 +219,10 @@ impl Swapchain {
     pub fn image_format(&self) -> vk::Format {
         unsafe { (*self.create_info.get()).image_format }
     }
+
+    pub fn get_image_extent(&self) -> vk::Extent2D {
+        unsafe { (*self.create_info.get()).image_extent }
+    }
 }
 
 impl Drop for Swapchain {

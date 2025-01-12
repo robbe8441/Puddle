@@ -1,5 +1,4 @@
 use ash::vk;
-use material::DefaultMaterial;
 use std::{sync::Arc, time::Instant};
 use svo::OctreeNode;
 
@@ -7,15 +6,14 @@ use camera::Camera;
 use math::{vec4, Mat4, Transform, Vec4};
 use rendering::{
     handler::{
+        material::MaterialHandle,
         render_batch::{DrawData, RenderBatch},
         RenderHandler,
     },
-    types::Material,
     vulkan::Buffer,
 };
 
 mod camera;
-mod material;
 pub mod svo;
 
 #[repr(C)]
@@ -30,7 +28,7 @@ pub struct World {
     pub camera: Camera,
     pub start_time: Instant,
     pub uniform_buffer: Arc<Buffer>,
-    pub material: Arc<dyn Material>,
+    pub material: MaterialHandle,
     pub voxel_octrees: Vec<OctreeNode>,
     pub voxel_buffers: Vec<Arc<Buffer>>,
 }
@@ -67,37 +65,13 @@ impl World {
 
         vertex_buffer.write(0, &CUBE_VERTECIES);
 
-        let code = include_bytes!("../../shaders/shader.spv");
-
-        let vertex_shader = renderer.load_shader(
-            code,
-            c"main",
-            vk::ShaderStageFlags::VERTEX,
-            vk::ShaderStageFlags::FRAGMENT,
-        );
-
-        let fragment_shader = renderer.load_shader(
-            code,
-            c"main",
-            vk::ShaderStageFlags::FRAGMENT,
-            vk::ShaderStageFlags::empty(),
-        );
-
-        let material = Arc::new(DefaultMaterial {
-            shaders: [vertex_shader, fragment_shader],
-        });
-
         let mut batch = RenderBatch::default();
-        batch.set_material(material.clone());
 
         renderer.set_uniform_buffer(uniform_buffer.clone(), 0);
 
         let cube_draw = DrawData {
             vertex_count: CUBE_VERTECIES.len() as u32,
-            vertex_size: std::mem::size_of::<[f32; 4]>() as u32,
             vertex_buffer: Some(vertex_buffer),
-            vertex_attribute_descriptions: vec![vk::VertexInputAttributeDescription2EXT::default()
-                .format(vk::Format::R32G32B32A32_SFLOAT)],
             ..Default::default()
         };
 
@@ -107,7 +81,7 @@ impl World {
         Self {
             camera,
             uniform_buffer,
-            material,
+            material: MaterialHandle::default(),
             start_time: Instant::now(),
             voxel_buffers: vec![],
             voxel_octrees: vec![],

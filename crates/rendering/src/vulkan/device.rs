@@ -15,7 +15,6 @@ pub struct VulkanDevice {
 
     pub pdevice: vk::PhysicalDevice,
     pub device: ash::Device,
-    pub shader_device: ash::ext::shader_object::Device,
     pub queues: DeviceQueues,
 
     pub surface: vk::SurfaceKHR,
@@ -56,8 +55,6 @@ impl VulkanDevice {
 
         let (device, queues) = create_device(&instance, pdevice)?;
 
-        let shader_device = ash::ext::shader_object::Device::new(&instance, &device);
-
         Ok(Self {
             #[cfg(debug_assertions)]
             debugger: debug::setup_debugger(&instance, &entry),
@@ -65,7 +62,6 @@ impl VulkanDevice {
             instance,
             pdevice,
             device,
-            shader_device,
             queues,
             surface,
             surface_loader,

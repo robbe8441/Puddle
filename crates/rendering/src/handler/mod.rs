@@ -2,11 +2,13 @@ use crate::vulkan::{Buffer, Swapchain, VulkanDevice};
 use ash::{prelude::VkResult, vk};
 use bindless::{get_free_slot, BindlessHandler, BindlessResourceHandle, ResourceSlot};
 use frame::FrameContext;
+use material::MaterialHandler;
 use render_batch::RenderBatch;
-use std::{ffi::CStr, io::Cursor, sync::Arc};
+use std::sync::Arc;
 
 mod bindless;
 mod frame;
+pub mod material;
 pub mod render_batch;
 
 /// max frames that can be Prerecorded, makes the render smoother but more delayed
@@ -15,11 +17,11 @@ pub const FLYING_FRAMES: usize = 2;
 pub struct RenderHandler {
     pub device: Arc<VulkanDevice>,
     swapchain: Swapchain,
+    materials: MaterialHandler,
     frames: [FrameContext; FLYING_FRAMES],
     batches: Vec<RenderBatch>,
     bindless_handler: BindlessHandler,
     frame_index: usize,
-    loaded_shaders: Vec<vk::ShaderEXT>,
     // a queue of resources that are supposed to be destroyed but need to wait for a fence
     destroy_queue: Vec<(vk::Fence, DestroyResource)>,
 }
@@ -35,50 +37,27 @@ impl RenderHandler {
 
         let swapchain = unsafe { Swapchain::new(device.clone(), window_size) }?;
 
+        let mut materials = MaterialHandler::new(device.clone(), &swapchain)?;
+
         let frames = std::array::from_fn(|_| unsafe { FrameContext::new(&device).unwrap() });
 
         let bindless_handler = BindlessHandler::new(&device)?;
 
+        materials.create_pipeline(
+            bindless_handler.pipeline_layout,
+            swapchain.get_image_extent(),
+        );
+
         Ok(Self {
             device,
             swapchain,
+            materials,
             frames,
             batches: vec![],
             bindless_handler,
             frame_index: 0,
-            loaded_shaders: vec![],
             destroy_queue: vec![],
         })
-    }
-
-    /// # Panics
-    pub fn load_shader(
-        &mut self,
-        code: &[u8],
-        entry: &CStr,
-        stage: vk::ShaderStageFlags,
-        next_stage: vk::ShaderStageFlags,
-    ) -> vk::ShaderEXT {
-        let mut code = Cursor::new(code);
-        let byte_code = ash::util::read_spv(&mut code).unwrap();
-
-        let create_info = [vk::ShaderCreateInfoEXT {
-            p_code: byte_code.as_ptr().cast(),
-            code_size: byte_code.len() * size_of::<u32>(),
-            p_set_layouts: &self.bindless_handler.descriptor_layout,
-            set_layout_count: 1,
-            code_type: vk::ShaderCodeTypeEXT::SPIRV,
-            stage,
-            next_stage,
-            p_name: entry.as_ptr(),
-            ..Default::default()
-        }];
-
-        let shader =
-            unsafe { self.device.shader_device.create_shaders(&create_info, None) }.unwrap()[0];
-        self.loaded_shaders.push(shader);
-
-        shader
     }
 
     #[inline]
@@ -157,6 +136,7 @@ impl RenderHandler {
         unsafe {
             self.frames[self.frame_index].execute(
                 &self.device,
+                &self.materials,
                 &self.swapchain,
                 &self.batches,
                 &self.bindless_handler,
@@ -252,9 +232,6 @@ impl Drop for RenderHandler {
             let _ = self.device.device_wait_idle();
             for frame in &self.frames {
                 frame.destroy(&self.device);
-            }
-            for shader in &self.loaded_shaders {
-                self.device.shader_device.destroy_shader(*shader, None);
             }
             self.bindless_handler.destroy(&self.device);
         }
