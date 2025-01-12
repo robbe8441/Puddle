@@ -19,9 +19,9 @@ fn update_camera(world: &mut World) {
 fn create_octree(app: &mut Application) {
     let voxel_buffer = Buffer::new(
         app.renderer.device.clone(),
-        8 * 1024 * 100,
+        1024 * 1000,
         vk::BufferUsageFlags::STORAGE_BUFFER,
-        vk::MemoryPropertyFlags::HOST_VISIBLE,
+        vk::MemoryPropertyFlags::DEVICE_LOCAL | vk::MemoryPropertyFlags::HOST_VISIBLE,
     )
     .unwrap();
 
@@ -37,17 +37,22 @@ fn create_octree(app: &mut Application) {
 fn write_octree(world: &mut World) {
     let buffer = &world.voxel_buffers[0];
     let octree = &mut world.voxel_octrees[0];
-    let t = world.start_time.elapsed().as_secs_f64() * 1.0;
+    let t = world.start_time.elapsed().as_secs_f64() * 10.0;
 
     let orbit_x = t.cos();
     let orbit_z = t.sin();
 
     let t = t * 1.1;
-    let x = orbit_x + (t / 2.1).cos();
-    let z = orbit_z + (t / 2.1).sin();
+    let x = orbit_x + (t / 10.1).cos() * 2.0;
+    let z = orbit_z + (t / 10.1).sin() * 2.0;
     let y = x.powi(2) * z.powi(2);
 
-    octree.write(dvec3(x / 2.0, y / 10.0, z /  2.0), (orbit_x * orbit_z * 255.0).abs().max(10.0) as u8, 9);
+    octree.write(dvec3(x / 3.0, y / 30.0, z / 3.0), 255, 9);
+
+    let x = orbit_x + (t / 4.1).cos() * 2.0;
+    let z = orbit_z + (t / 4.1).sin() * 2.0;
+
+    octree.write(dvec3(-x / 3.0, -y / 100.0, -z / 3.0), 255, 9);
 
     let flatten = octree.flatten();
     let bytes = flatten.as_bytes();
@@ -84,4 +89,3 @@ fn main() -> Result<(), Box<dyn Error>> {
 //     let flat = octree.flatten();
 //     dbg!(flat);
 // }
-

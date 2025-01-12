@@ -1,5 +1,6 @@
 #![feature(debug_closure_helpers)]
 #![feature(box_as_ptr)]
+#![allow(clippy::cast_possible_truncation)]
 
 use ash::prelude::VkResult;
 use rendering::handler::RenderHandler;
@@ -46,21 +47,29 @@ impl Application {
     }
 
     pub fn run(&mut self) {
+        let mut dt = std::time::Instant::now();
+
         while !self.window.window.should_close() {
+            println!("fps: {}", 1.0 / dt.elapsed().as_secs_f64());
+            dt = std::time::Instant::now();
+
             for task in &self.tasks {
                 (task)(&mut self.world);
             }
 
             self.world.update();
 
-            let _ = unsafe { self.renderer.on_render() }.inspect_err(|v| eprintln!("{v:?}"));
+            let _ = self
+                .renderer
+                .on_render()
+                .inspect_err(|v| eprintln!("{v:?}"));
 
             self.window.glfw_ctx.poll_events();
 
             for (_, event) in glfw::flush_messages(&self.window.glfw_events) {
                 match event {
                     glfw::WindowEvent::Size(x, y) => {
-                        let _ = unsafe { self.renderer.on_window_resize([x as u32, y as u32]) };
+                        let _ = self.renderer.on_window_resize([x as u32, y as u32]);
                         self.world.camera.aspect = x as f32 / y as f32;
                     }
                     glfw::WindowEvent::Close => {

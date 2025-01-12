@@ -1,6 +1,6 @@
 #![allow(clippy::cast_lossless, clippy::cast_possible_truncation)]
 
-use std::{collections::VecDeque, fmt::Debug, sync::Arc, usize};
+use std::{collections::VecDeque, fmt::Debug, sync::Arc};
 
 use math::{dvec3, DVec3};
 

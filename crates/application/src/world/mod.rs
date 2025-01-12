@@ -1,6 +1,6 @@
 use ash::vk;
 use material::DefaultMaterial;
-use std::{str::FromStr, sync::Arc, time::Instant};
+use std::{sync::Arc, time::Instant};
 use svo::OctreeNode;
 
 use camera::Camera;
@@ -36,6 +36,8 @@ pub struct World {
 }
 
 impl World {
+    /// # Panics
+    /// if there is no space to allocate the uniform buffer
     pub fn new(renderer: &mut RenderHandler) -> Self {
         let image_res = renderer.get_swapchain_resolution();
 
@@ -51,7 +53,7 @@ impl World {
             renderer.device.clone(),
             std::mem::size_of::<UniformData>() as u64,
             vk::BufferUsageFlags::UNIFORM_BUFFER,
-            vk::MemoryPropertyFlags::HOST_VISIBLE,
+            vk::MemoryPropertyFlags::DEVICE_LOCAL | vk::MemoryPropertyFlags::HOST_VISIBLE,
         )
         .unwrap();
 

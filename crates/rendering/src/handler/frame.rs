@@ -7,7 +7,7 @@ use ash::{
 
 pub struct FrameContext {
     /// tells if this ``FrameContext`` is currently executing
-    is_executing_fence: vk::Fence,
+    pub is_executing_fence: vk::Fence,
     /// tells when the image is ready to be drawn on to
     image_available_semaphore: vk::Semaphore,
     /// tells when the render has finished and is ready to be presented
@@ -107,6 +107,7 @@ impl FrameContext {
         swapchain: &Swapchain,
         batches: &[RenderBatch],
         bindless_handler: &BindlessHandler,
+        frame_index: usize,
     ) -> VkResult<()> {
         // wait for the commandbuffer to finish executing before resetting it
         device.wait_for_fences(&[self.is_executing_fence], true, u64::MAX)?;
@@ -121,10 +122,16 @@ impl FrameContext {
         *wait_fence = self.is_executing_fence;
 
         device.reset_fences(&[self.is_executing_fence])?;
-
         device.reset_command_buffer(self.command_buffer, vk::CommandBufferResetFlags::empty())?;
 
-        self.record_command_buffer(device, swapchain, image_index, batches, bindless_handler)?;
+        self.record_command_buffer(
+            device,
+            swapchain,
+            image_index,
+            batches,
+            bindless_handler,
+            frame_index,
+        )?;
 
         self.submit(device, swapchain, image_index)?;
         Ok(())
@@ -137,6 +144,7 @@ impl FrameContext {
         image_index: u32,
         batches: &[RenderBatch],
         bindless_handler: &BindlessHandler,
+        frame_index: usize,
     ) -> VkResult<()> {
         let command_buffer = self.command_buffer;
         let swapchain_views = &*swapchain.images.get();
@@ -152,7 +160,7 @@ impl FrameContext {
             vk::PipelineBindPoint::GRAPHICS,
             bindless_handler.pipeline_layout,
             0,
-            &[bindless_handler.descriptor_set],
+            &[bindless_handler.descriptor_sets[frame_index]],
             &[],
         );
 

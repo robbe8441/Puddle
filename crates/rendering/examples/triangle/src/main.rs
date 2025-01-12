@@ -362,7 +362,6 @@ fn main() {
 
                 glfw::WindowEvent::Size(x, y) => {
                     unsafe {
-                        let _ = app.vk_device.device_wait_idle();
                         app.swapchain
                             .recreate(&app.vk_device, [x as u32, y as u32])
                             .unwrap();

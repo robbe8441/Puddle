@@ -78,12 +78,12 @@ impl Swapchain {
             .find(|&mode| mode == vk::PresentModeKHR::MAILBOX)
             .unwrap_or(vk::PresentModeKHR::FIFO);
 
-        let mut desired_image_count = surface_capabilities.min_image_count + 1;
+        let mut desired_image_count = surface_capabilities.min_image_count.max(3);
         if surface_capabilities.max_image_count > 0
             && desired_image_count > surface_capabilities.max_image_count
         {
             desired_image_count = surface_capabilities.max_image_count;
-        }
+        };
 
         let swapchain_create_info = vk::SwapchainCreateInfoKHR::default()
             .surface(device.surface)
@@ -154,11 +154,11 @@ impl Swapchain {
 
                 let main_view = device.create_image_view(&info, None).unwrap();
 
-                let (depth_memory, depth_image, depth_view) =
-                    create_texture(&device, image_extent, vk::Format::R32_SFLOAT).unwrap();
-
                 let (normal_memory, normal_image, normal_view) =
                     create_texture(&device, image_extent, vk::Format::R32G32B32A32_SFLOAT).unwrap();
+
+                let (depth_memory, depth_image, depth_view) =
+                    create_texture(&device, image_extent, vk::Format::R32_SFLOAT).unwrap();
 
                 SwapchainImage {
                     main_image,

@@ -121,7 +121,6 @@ uint trace_ray(uint octree_index, Ray ray, out Hit hit) {
                 continue;
             }
 
-
             if (is_leaf){
                 let hit_pos = ray.o + ray.d * hit.tmin;
                 hit.n = box_normal(new_center, minBox, maxBox, hit_pos);

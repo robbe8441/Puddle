@@ -64,8 +64,8 @@ pub trait Material {
             0,
             &[
                 vk::ColorComponentFlags::RGBA,
-                vk::ColorComponentFlags::R,
                 vk::ColorComponentFlags::RGBA,
+                vk::ColorComponentFlags::R,
             ],
         )
     }
@@ -103,18 +103,5 @@ pub trait Material {
 
         let write_mask = self.set_color_write_mask();
         s_device.cmd_set_color_write_mask(cmd, write_mask.0, write_mask.1);
-    }
-}
-
-pub struct DefaultMaterial {
-    pub shaders: [vk::ShaderEXT; 2],
-}
-
-impl Material for DefaultMaterial {
-    fn shaders(&self) -> (&[vk::ShaderEXT], &[vk::ShaderStageFlags]) {
-        (
-            &self.shaders,
-            &[vk::ShaderStageFlags::VERTEX, vk::ShaderStageFlags::FRAGMENT],
-        )
     }
 }

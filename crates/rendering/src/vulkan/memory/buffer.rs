@@ -1,4 +1,4 @@
-use std::{ffi::c_void, ptr::NonNull, sync::Arc, usize};
+use std::{ffi::c_void, ptr::NonNull, sync::Arc};
 
 use ash::{prelude::VkResult, vk};
 
@@ -10,7 +10,9 @@ pub struct Buffer {
     memory: Arc<MemoryBlock>,
     handle: vk::Buffer,
     size: u64,
-    offset: u64,
+    // offset: u64,
+    usage: vk::BufferUsageFlags,
+    property_flags: vk::MemoryPropertyFlags,
     ptr: Option<NonNull<c_void>>,
 }
 
@@ -44,10 +46,20 @@ impl Buffer {
             memory: Arc::new(memory),
             handle: buffer,
             size,
-            offset: 0,
+            // offset: 0,
+            usage,
+            property_flags,
             ptr,
         }
         .into())
+    }
+
+    /// resizes the buffer
+    /// needs ownership to ensure that the buffer isn't currently being used
+    /// # Errors
+    /// if there is no space left to allocate
+    pub fn resize(&self, device: Arc<VulkanDevice>, new_size: u64) -> VkResult<Arc<Self>> {
+        Self::new(device, new_size, self.usage, self.property_flags)
     }
 
     /// offset is in units of T, like an array index instead of Bytes
