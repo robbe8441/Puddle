@@ -33,10 +33,10 @@ impl SwapchainImage {
 
 pub struct Swapchain {
     device: Arc<VulkanDevice>,
-    pub handle: UnsafeCell<vk::SwapchainKHR>,
+    pub handle: vk::SwapchainKHR,
     pub loader: ash::khr::swapchain::Device,
-    pub images: UnsafeCell<Vec<SwapchainImage>>,
-    pub create_info: UnsafeCell<vk::SwapchainCreateInfoKHR<'static>>,
+    pub images: Vec<SwapchainImage>,
+    pub create_info: vk::SwapchainCreateInfoKHR<'static>,
 }
 
 impl Swapchain {
@@ -113,10 +113,10 @@ impl Swapchain {
 
         Ok(Self {
             device,
-            handle: UnsafeCell::new(swapchain),
+            handle: swapchain,
             loader: swapchain_loader,
-            create_info: UnsafeCell::new(swapchain_create_info),
-            images: UnsafeCell::new(images),
+            create_info: swapchain_create_info,
+            images,
         })
     }
 
@@ -181,34 +181,36 @@ impl Swapchain {
     /// # Errors
     /// if there was an issue allocating new images
     /// for example if no space if left
-    pub unsafe fn recreate(&self, device: Arc<VulkanDevice>, new_extent: [u32; 2]) -> VkResult<()> {
-        let handle = self.handle.get();
-
+    pub unsafe fn recreate(
+        &mut self,
+        device: Arc<VulkanDevice>,
+        new_extent: [u32; 2],
+    ) -> VkResult<()> {
         let image_extent = vk::Extent2D {
             width: new_extent[0],
             height: new_extent[1],
         };
 
-        (*self.create_info.get()).image_extent = image_extent;
+        self.create_info.image_extent = image_extent;
 
         let create_info = vk::SwapchainCreateInfoKHR {
-            old_swapchain: *handle,
-            ..*self.create_info.get()
+            old_swapchain: self.handle,
+            ..self.create_info
         };
 
-        *handle = self.loader.create_swapchain(&create_info, None)?;
+        self.handle = self.loader.create_swapchain(&create_info, None)?;
 
-        for image in &*self.images.get() {
+        for image in &self.images {
             image.destroy(&device);
         }
 
         self.loader
             .destroy_swapchain(create_info.old_swapchain, None);
 
-        *self.images.get() = Self::create_swapchain_images(
+        self.images = Self::create_swapchain_images(
             device,
             &self.loader,
-            *handle,
+            self.handle,
             create_info.image_format,
             new_extent,
         )?;
@@ -217,23 +219,22 @@ impl Swapchain {
     }
 
     pub fn image_format(&self) -> vk::Format {
-        unsafe { (*self.create_info.get()).image_format }
+        self.create_info.image_format
     }
 
     pub fn get_image_extent(&self) -> vk::Extent2D {
-        unsafe { (*self.create_info.get()).image_extent }
+        self.create_info.image_extent
     }
 }
 
 impl Drop for Swapchain {
     fn drop(&mut self) {
         unsafe {
-            for image in &*self.images.get() {
+            for image in &self.images {
                 image.destroy(&self.device);
             }
 
-            let handle = *self.handle.get();
-            self.loader.destroy_swapchain(handle, None);
+            self.loader.destroy_swapchain(self.handle, None);
         }
     }
 }

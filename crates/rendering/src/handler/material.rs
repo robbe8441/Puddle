@@ -31,7 +31,7 @@ impl MaterialHandler {
             vk::AttachmentDescription {
                 initial_layout: vk::ImageLayout::UNDEFINED,
                 final_layout: vk::ImageLayout::PRESENT_SRC_KHR,
-                format: unsafe { *swapchain.create_info.get() }.image_format,
+                format: swapchain.image_format(),
                 ..attachment_desc
             },
             vk::AttachmentDescription {
@@ -62,12 +62,21 @@ impl MaterialHandler {
             },
         ];
 
+        let subpass_dependencies = [vk::SubpassDependency::default()
+            .src_subpass(vk::SUBPASS_EXTERNAL)
+            .dst_subpass(0)
+            .src_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+            .dst_stage_mask(vk::PipelineStageFlags::COLOR_ATTACHMENT_OUTPUT)
+            .src_access_mask(vk::AccessFlags::NONE)
+            .dst_access_mask(vk::AccessFlags::COLOR_ATTACHMENT_WRITE)];
+
         let subpasses = [vk::SubpassDescription::default()
             .pipeline_bind_point(vk::PipelineBindPoint::GRAPHICS)
             .color_attachments(&color_attachments_ref)];
 
         let renderpass_info = vk::RenderPassCreateInfo::default()
             .attachments(&attachments)
+            .dependencies(&subpass_dependencies)
             .subpasses(&subpasses);
 
         let swapchain_res = swapchain.get_image_extent();
@@ -81,7 +90,8 @@ impl MaterialHandler {
             .layers(1);
 
         let framebuffers = unsafe {
-            (*swapchain.images.get())
+            swapchain
+                .images
                 .iter()
                 .map(|v| {
                     let attachments = [v.main_view, v.normal_view, v.depth_view];
@@ -167,9 +177,6 @@ impl MaterialHandler {
         let multisample_state = vk::PipelineMultisampleStateCreateInfo::default()
             .sample_shading_enable(false)
             .rasterization_samples(vk::SampleCountFlags::TYPE_1);
-
-        let dynamic_states = vk::PipelineDynamicStateCreateInfo::default()
-            .dynamic_states(&[vk::DynamicState::VIEWPORT, vk::DynamicState::SCISSOR]);
 
         let viewport = vk::Viewport::default()
             .x(0.0)

@@ -121,7 +121,7 @@ impl RenderHandler {
     /// # Errors
     /// if there was an issue creating a new swapchain
     /// for example if there is no memory left
-    pub fn on_window_resize(&self, new_size: [u32; 2]) -> VkResult<()> {
+    pub fn on_window_resize(&mut self, new_size: [u32; 2]) -> VkResult<()> {
         unsafe {
             self.device.device_wait_idle()?;
             self.swapchain.recreate(self.device.clone(), new_size)
@@ -137,7 +137,7 @@ impl RenderHandler {
             self.frames[self.frame_index].execute(
                 &self.device,
                 &self.materials,
-                &self.swapchain,
+                &mut self.swapchain,
                 &self.batches,
                 &self.bindless_handler,
                 self.frame_index,
@@ -153,7 +153,7 @@ impl RenderHandler {
     }
 
     pub fn get_swapchain_resolution(&self) -> vk::Extent2D {
-        unsafe { (*self.swapchain.create_info.get()).image_extent }
+        self.swapchain.create_info.image_extent
     }
 
     /// resizes a buffer buffer that bound

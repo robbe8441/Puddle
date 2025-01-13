@@ -21,7 +21,7 @@ fn create_octree(app: &mut Application) {
         app.renderer.device.clone(),
         1024 * 1000,
         vk::BufferUsageFlags::STORAGE_BUFFER,
-        vk::MemoryPropertyFlags::DEVICE_LOCAL | vk::MemoryPropertyFlags::HOST_VISIBLE,
+        vk::MemoryPropertyFlags::HOST_VISIBLE,
     )
     .unwrap();
 
@@ -38,6 +38,10 @@ fn write_octree(world: &mut World) {
     let buffer = &world.voxel_buffers[0];
     let octree = &mut world.voxel_octrees[0];
     let t = world.start_time.elapsed().as_secs_f64() * 10.0;
+
+    if t > 300.0 {
+        return;
+    }
 
     let orbit_x = t.cos();
     let orbit_z = t.sin();

@@ -1,8 +1,4 @@
-use super::{
-    bindless::BindlessHandler,
-    material::{self, MaterialHandler},
-    render_batch::RenderBatch,
-};
+use super::{bindless::BindlessHandler, material::MaterialHandler, render_batch::RenderBatch};
 use crate::vulkan::{Swapchain, VulkanDevice};
 use ash::{
     prelude::VkResult,
@@ -63,9 +59,8 @@ impl FrameContext {
     }
 
     unsafe fn request_image_index(&self, swapchain: &Swapchain) -> VkResult<(u32, bool)> {
-        let handle = *swapchain.handle.get();
         swapchain.loader.acquire_next_image(
-            handle,
+            swapchain.handle,
             u64::MAX,
             self.image_available_semaphore,
             vk::Fence::null(),
@@ -90,7 +85,7 @@ impl FrameContext {
 
         device.queue_submit(device.queues.graphics.1, &submits, self.is_executing_fence)?;
 
-        let swapchains = [*swapchain.handle.get()];
+        let swapchains = [swapchain.handle];
         let image_indices = [image_index];
 
         let present_info = vk::PresentInfoKHR::default()
@@ -109,7 +104,7 @@ impl FrameContext {
         &self,
         device: &VulkanDevice,
         materials: &MaterialHandler,
-        swapchain: &Swapchain,
+        swapchain: &mut Swapchain,
         batches: &[RenderBatch],
         bindless_handler: &BindlessHandler,
         frame_index: usize,
@@ -120,7 +115,7 @@ impl FrameContext {
         let (image_index, _suboptimal) = self.request_image_index(swapchain)?;
 
         // if there is still being rendered to the image, then we need to wait
-        let wait_fence = &mut (*swapchain.images.get())[image_index as usize].available;
+        let wait_fence = &mut swapchain.images[image_index as usize].available;
         if !wait_fence.is_null() {
             device.wait_for_fences(&[*wait_fence], true, u64::MAX)?;
         }
