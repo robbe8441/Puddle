@@ -6,15 +6,15 @@ use std::{
     ptr::null_mut,
 };
 
-const INVALID: u32 = u32::MAX;
+use crate::{PoolAllocator, TypedPoolAllocator};
 
 /// a small pointer that contains some metadata about the allocation
 /// otherwise the allocator would need to store this
 #[derive(Clone, Copy)]
 pub struct FreeListPtr<T> {
     ptr: *mut T,
-    pad: u32,
-    size: u32,
+    pad: usize,
+    size: usize,
 }
 
 impl<T> FreeListPtr<T> {
@@ -49,18 +49,20 @@ impl<T> Deref for FreeListPtr<T> {
 /// a ``FreeListAllocator`` keeps track of dynamic (de)allocations within a memory region
 /// this allocator is affected by memory fragmentation
 /// if you want to minimize fragmentation, consider using another allocator.
-/// also to improve memory usage the limit of the allocation is ``u32::MAX`` bytes (4.2 GB)
+/// also to improve memory usage the limit of the allocation is ``usize::MAX`` bytes (4.2 GB)
 pub struct FreeListAllocator {
-    head: u32,
+    head: usize,
+    mem_size: usize,
     memory: *mut i8,
+    pool_alloc: TypedPoolAllocator<FreeListPtr<i8>>,
 }
 
 #[derive(Debug, Clone, Copy)]
 struct Node {
     /// the offset to the next node (in bytes)
-    next: u32,
+    next: *mut i8,
     /// the size of this node (in bytes)
-    size: u32,
+    size: usize,
 }
 
 impl Node {
@@ -77,15 +79,19 @@ impl FreeListAllocator {
     /// # Safety
     /// ``memory`` and ``mem_size`` need to be valid
     /// # Panics
-    /// if the size is bigger than ``u32::MAX``
+    /// if the size is bigger than ``usize::MAX``
     pub unsafe fn new(memory: *mut i8, mem_size: usize) -> Self {
-        assert!(u32::try_from(mem_size).is_ok());
+        assert!(usize::try_from(mem_size).is_ok());
         assert!(memory.is_aligned_to(align_of::<Node>()));
 
+        let max_elements = mem_size / size_of::<FreeListPtr<i8>>();
+
         *memory.cast::<Node>() = Node {
-            next: INVALID,
-            size: mem_size as u32,
+            next: null_mut(),
+            size: mem_size,
         };
+
+        let pool = TypedPoolAllocator::new(memory, 1);
 
         Self { head: 0, memory }
     }
@@ -109,7 +115,7 @@ impl FreeListAllocator {
             let node_addr = self.memory.add(node_index as usize).cast::<Node>();
             let padding = (layout.align() - (node_addr as usize % layout.align())) % layout.align();
 
-            let alloc_size = (layout.size() + padding) as u32;
+            let alloc_size = (layout.size() + padding) as usize;
 
             let mut return_full_node = |size| {
                 let node_to_return;
@@ -124,7 +130,7 @@ impl FreeListAllocator {
 
                 Some(FreeListPtr {
                     ptr: self.memory.add(node_to_return + padding).cast(),
-                    pad: padding as u32,
+                    pad: padding as usize,
                     size,
                 })
             };
@@ -135,7 +141,7 @@ impl FreeListAllocator {
                 }
                 std::cmp::Ordering::Greater => {
                     let left_over_size = (*node_addr).size - alloc_size;
-                    if left_over_size < size_of::<Node>() as u32 {
+                    if left_over_size < size_of::<Node>() as usize {
                         return return_full_node(alloc_size + left_over_size);
                     }
 
@@ -153,7 +159,7 @@ impl FreeListAllocator {
                     return Some(FreeListPtr {
                         ptr: self.memory.add(node_index as usize + padding).cast(),
                         size: alloc_size,
-                        pad: padding as u32,
+                        pad: padding as usize,
                     });
                 }
                 std::cmp::Ordering::Less => {}
@@ -185,7 +191,7 @@ impl FreeListAllocator {
 
         // there is no free space, so no point in checking for touching nodes
         if self.head == INVALID {
-            self.head = real_ptr.cast::<i8>().offset_from(self.memory) as u32;
+            self.head = real_ptr.cast::<i8>().offset_from(self.memory) as usize;
         } else {
             self.dealloc_intern(real_ptr);
         }
@@ -194,7 +200,7 @@ impl FreeListAllocator {
     #[allow(clippy::cast_sign_loss)]
     unsafe fn dealloc_intern(&mut self, ptr: *mut Node) {
         let mut node_index = self.head;
-        let search_index = ptr.cast::<i8>().offset_from(self.memory) as u32;
+        let search_index = ptr.cast::<i8>().offset_from(self.memory) as usize;
 
         let mut p_node: *mut Node = self.memory.add(node_index as usize).cast::<Node>();
         let mut p_previous: *mut Node = null_mut();
@@ -225,19 +231,3 @@ impl FreeListAllocator {
     }
 }
 
-#[allow(clippy::cast_ptr_alignment)]
-impl Debug for FreeListAllocator {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let mut list = f.debug_list();
-
-        let mut node_ptr = self.head;
-
-        while node_ptr != INVALID {
-            let node = unsafe { &*self.memory.add(node_ptr as usize).cast::<Node>() };
-            list.entry(&node.size);
-            node_ptr = node.next;
-        }
-
-        list.finish()
-    }
-}

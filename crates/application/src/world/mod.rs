@@ -1,15 +1,15 @@
 use ash::vk;
-use std::{sync::Arc, time::Instant};
+use std::{io::Cursor, sync::Arc, time::Instant};
 use svo::OctreeNode;
 
 use camera::Camera;
 use math::{vec4, Mat4, Transform, Vec4};
 use rendering::{
     handler::{
-        material::MaterialHandle,
         render_batch::{DrawData, RenderBatch},
         RenderHandler,
     },
+    types::{Material, MaterialCreateInfo, UDim2, VertexInput},
     vulkan::Buffer,
 };
 
@@ -28,7 +28,7 @@ pub struct World {
     pub camera: Camera,
     pub start_time: Instant,
     pub uniform_buffer: Arc<Buffer>,
-    pub material: MaterialHandle,
+    pub material: Arc<Material>,
     pub voxel_octrees: Vec<OctreeNode>,
     pub voxel_buffers: Vec<Arc<Buffer>>,
 }
@@ -76,12 +76,50 @@ impl World {
         };
 
         batch.add_draw_call(cube_draw);
+
+        let vertex_input = VertexInput {
+            attributes: vec![vk::VertexInputAttributeDescription::default()
+                .format(vk::Format::R32G32B32A32_SFLOAT)],
+            bindings: vec![vk::VertexInputBindingDescription::default()
+                .input_rate(vk::VertexInputRate::VERTEX)
+                .stride(std::mem::size_of::<[f32; 4]>() as u32)],
+        };
+
+        let mut code = Cursor::new(include_bytes!("../../shaders/shader.spv"));
+        let byte_code = ash::util::read_spv(&mut code).unwrap();
+
+        let module_info = vk::ShaderModuleCreateInfo::default().code(&byte_code);
+        let module = unsafe { renderer.device.create_shader_module(&module_info, None) }.unwrap();
+
+        let material_info = MaterialCreateInfo {
+            cull_mode: rendering::types::CullingMode::Front,
+            viewport: UDim2 {
+                scale: [1.0, 1.0],
+                offset: [0.0, 0.0],
+            },
+            vertex_input,
+            shaders: vec![
+                vk::PipelineShaderStageCreateInfo::default()
+                    .name(c"main")
+                    .stage(vk::ShaderStageFlags::VERTEX)
+                    .module(module),
+                vk::PipelineShaderStageCreateInfo::default()
+                    .name(c"main")
+                    .stage(vk::ShaderStageFlags::FRAGMENT)
+                    .module(module),
+            ],
+        };
+
+        let material = renderer.load_material(material_info);
+
+        batch.set_material(material.clone());
+
         renderer.add_render_batch(batch);
 
         Self {
             camera,
             uniform_buffer,
-            material: MaterialHandle::default(),
+            material,
             start_time: Instant::now(),
             voxel_buffers: vec![],
             voxel_octrees: vec![],

@@ -13,13 +13,13 @@ fn update_camera(world: &mut World) {
     let t = world.start_time.elapsed().as_secs_f32() / 5.0;
 
     world.camera.transform =
-        Transform::from_xyz(t.cos(), 0.5, t.sin()).looking_at(Vec3::ZERO, Vec3::Y);
+        Transform::from_xyz(t.cos() * 2.0, 0.1, t.sin() * 0.1).looking_at(Vec3::ZERO, Vec3::Y);
 }
 
 fn create_octree(app: &mut Application) {
     let voxel_buffer = Buffer::new(
         app.renderer.device.clone(),
-        1024 * 1000,
+        1024 * 1024, // 1 Mib
         vk::BufferUsageFlags::STORAGE_BUFFER,
         vk::MemoryPropertyFlags::HOST_VISIBLE,
     )
@@ -28,7 +28,13 @@ fn create_octree(app: &mut Application) {
     let handle = app.renderer.set_storage_buffer(voxel_buffer.clone(), 0);
     assert!(handle.index == 0);
 
-    let octree = OctreeNode::default();
+    let mut octree = OctreeNode::default();
+    octree.write(dvec3(0.0, 0.0, 0.0), 255, 3);
+
+    let flatten = octree.flatten();
+    let bytes = flatten.as_bytes();
+
+    voxel_buffer.write(0, bytes);
 
     app.world.voxel_octrees.push(octree);
     app.world.voxel_buffers.push(voxel_buffer);

@@ -13,10 +13,10 @@
             "state": {
               "type": "canvas",
               "state": {
-                "file": "Resouce_Manager/Structure.canvas",
+                "file": "Renderer/Structure.canvas",
                 "viewState": {
-                  "x": 14,
-                  "y": -141.5,
+                  "x": 194,
+                  "y": -221,
                   "zoom": 0
                 }
               },
@@ -167,14 +167,14 @@
   },
   "active": "32955a4003601ee4",
   "lastOpenFiles": [
+    "Renderer/Vulkan.md",
+    "Resouce_Manager/Structure.canvas",
     "2. Project Structure.canvas",
     "Resouce.md",
     "1. Puddle.md",
     "Renderer/Structure.canvas",
-    "Renderer/Vulkan.md",
     "Extra/Allocators.md",
     "Extra",
-    "Resouce_Manager/Structure.canvas",
     "Resouce_Manager",
     "Resource_Manager",
     "Renderer/Structure.md",

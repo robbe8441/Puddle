@@ -1,8 +1,11 @@
-use crate::vulkan::{Buffer, VulkanDevice};
+use crate::{
+    types::Material,
+    vulkan::{Buffer, VulkanDevice},
+};
 use ash::vk;
 use std::sync::Arc;
 
-use super::material::{MaterialHandle, MaterialHandler};
+use super::material::MaterialHandler;
 
 /// ``DrawData`` contains all the data needed for a single Draw call
 #[derive(Default)]
@@ -47,13 +50,13 @@ impl DrawData {
 
 #[derive(Default)]
 pub struct RenderBatch {
-    material: MaterialHandle,
+    material: Option<Arc<Material>>,
     draws: Vec<DrawData>,
 }
 
 impl RenderBatch {
-    pub fn set_material(&mut self, handle: MaterialHandle) {
-        self.material = handle;
+    pub fn set_material(&mut self, material: Arc<Material>) {
+        self.material = Some(material);
     }
 
     pub fn add_draw_call(&mut self, draw_data: DrawData) {
@@ -63,11 +66,12 @@ impl RenderBatch {
     pub(crate) unsafe fn execute(
         &self,
         device: &VulkanDevice,
-        materials: &MaterialHandler,
         cmd: vk::CommandBuffer,
     ) {
-        let pipeline = materials.get_material(&self.material);
-        device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, pipeline);
+        let Some(material) = &self.material else {
+            panic!("no material set when rendering")
+        };
+        device.cmd_bind_pipeline(cmd, vk::PipelineBindPoint::GRAPHICS, material.pipeline);
 
         for command in &self.draws {
             command.execute(device, cmd);

@@ -192,7 +192,7 @@ impl FrameContext {
         device.cmd_begin_render_pass(command_buffer, &begin_info, vk::SubpassContents::INLINE);
 
         for batch in batches {
-            batch.execute(device, materials, command_buffer);
+            batch.execute(device, command_buffer);
         }
 
         device.cmd_end_render_pass(command_buffer);

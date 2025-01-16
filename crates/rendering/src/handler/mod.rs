@@ -1,4 +1,7 @@
-use crate::vulkan::{Buffer, Swapchain, VulkanDevice};
+use crate::{
+    types::{Material, MaterialCreateInfo},
+    vulkan::{Buffer, Swapchain, VulkanDevice},
+};
 use ash::{prelude::VkResult, vk};
 use bindless::{get_free_slot, BindlessHandler, BindlessResourceHandle, ResourceSlot};
 use frame::FrameContext;
@@ -37,16 +40,11 @@ impl RenderHandler {
 
         let swapchain = unsafe { Swapchain::new(device.clone(), window_size) }?;
 
-        let mut materials = MaterialHandler::new(device.clone(), &swapchain)?;
+        let materials = MaterialHandler::new(device.clone(), &swapchain)?;
 
         let frames = std::array::from_fn(|_| unsafe { FrameContext::new(&device).unwrap() });
 
         let bindless_handler = BindlessHandler::new(&device)?;
-
-        materials.create_pipeline(
-            bindless_handler.pipeline_layout,
-            swapchain.get_image_extent(),
-        );
 
         Ok(Self {
             device,
@@ -124,14 +122,23 @@ impl RenderHandler {
     pub fn on_window_resize(&mut self, new_size: [u32; 2]) -> VkResult<()> {
         unsafe {
             self.device.device_wait_idle()?;
-            self.swapchain.recreate(self.device.clone(), new_size)
+            self.swapchain.recreate(self.device.clone(), new_size)?;
+            self.materials
+                .on_resize(&self.swapchain, self.bindless_handler.pipeline_layout);
         }
+
+        Ok(())
     }
 
     /// # Safety
     /// # Errors
     pub fn on_render(&mut self) -> VkResult<()> {
         self.frame_index = (self.frame_index + 1) % FLYING_FRAMES;
+
+        self.bindless_handler
+            .update_descriptor_set(&self.device, self.frame_index);
+
+        self.clean_resources();
 
         unsafe {
             self.frames[self.frame_index].execute(
@@ -144,10 +151,6 @@ impl RenderHandler {
             )?;
         }
 
-        self.bindless_handler
-            .update_descriptor_set(&self.device, self.frame_index);
-
-        self.clean_resources();
 
         Ok(())
     }
@@ -217,6 +220,20 @@ impl RenderHandler {
                 i += 1;
             }
         }
+    }
+
+    pub fn load_material(&mut self, info: MaterialCreateInfo) -> Arc<Material> {
+        let swapchain_res = self.swapchain.get_image_extent();
+
+        let material = Arc::new(info.build(
+            &self.device,
+            self.materials.main_renderpass,
+            self.bindless_handler.pipeline_layout,
+            [swapchain_res.width, swapchain_res.height],
+        ));
+
+        self.materials.materials.push(material.clone());
+        material
     }
 }
 

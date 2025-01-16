@@ -1,6 +1,9 @@
-[package]
-name = "puddle"
-version = "0.1.0"
-edition = "2021"
+[workspace]
+members = [
+	"crates/*",
+]
+resolver = "2"
 
-[dependencies]
+[workspace.dependencies]
+gpu-allocator = { git = "https://github.com/Traverse-Research/gpu-allocator", features = ["vulkan", "visualizer"] }
+ash = "0.38.0"

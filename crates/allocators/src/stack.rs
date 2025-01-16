@@ -1,4 +1,4 @@
-use std::{alloc::Layout, ffi::c_void, ptr::null_mut};
+use std::{alloc::Layout, ptr::null_mut};
 
 /// the ``StackAllocator`` is good to use for algorithms
 /// it eliminates memory fragmentation and improves cache locality
@@ -22,7 +22,7 @@ use std::{alloc::Layout, ffi::c_void, ptr::null_mut};
 /// this is slow and should be avoided, its main use is not to crash if no space if left
 pub struct StackAllocator {
     /// the pointer to the memory
-    memory: *mut c_void,
+    memory: *mut i8,
 
     /// how big that memory is (bytes)
     mem_size: usize,
@@ -44,7 +44,7 @@ impl StackAllocator {
     /// if allocation fails
     /// # Safety
     /// the memory needs to be deallocated manually (to allow using custom allocators)
-    pub fn new(mem: *mut c_void, mem_size: usize) -> Self {
+    pub fn new(mem: *mut i8, mem_size: usize) -> Self {
         Self {
             memory: mem,
             mem_size,
@@ -52,7 +52,7 @@ impl StackAllocator {
         }
     }
 
-    unsafe fn allocate_unaligned(&mut self, size: usize) -> *mut c_void {
+    unsafe fn allocate_unaligned(&mut self, size: usize) -> *mut i8 {
         let old_size = self.mem_used;
         self.mem_used += size;
 
@@ -69,7 +69,7 @@ impl StackAllocator {
     /// return null if there was an issue resizing the memory
     /// # Panics
     /// if align is bigger than 128
-    pub fn allocate(&mut self, layout: Layout) -> *mut c_void {
+    pub fn allocate(&mut self, layout: Layout) -> *mut i8 {
         assert!(
             layout.align() <= 128,
             "align must be smaller than 128 bytes"
